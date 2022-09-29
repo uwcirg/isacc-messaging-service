@@ -1,3 +1,4 @@
+from flask import current_app
 import requests
 
 from isacc_messaging.audit import audit_entry
@@ -36,7 +37,7 @@ def HAPI_request(
             )
         except requests.exceptions.ConnectionError as error:
             current_app.logger.exception(error)
-            raise RuntimeError(f"{FHIR_URL} inaccessible")
+            raise RuntimeError(f"{url} inaccessible")
     elif VERB == "POST":
         resp = requests.post(
             url, params=params, json=resource, timeout=30
