@@ -26,4 +26,5 @@ ENV FLASK_APP=isacc_messaging.app:create_app() \
 EXPOSE "${PORT}"
 
 ENTRYPOINT ["/scripts/commands.sh"]
-CMD ["8000", "isacc_messaging.app:create_app()"]
+# Use CMD in shell-form to pass interpolated values into commands.sh
+CMD "-p ${PORT:-8000}" "-f ${FLASK_APP}"

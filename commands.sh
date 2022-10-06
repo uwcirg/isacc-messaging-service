@@ -5,13 +5,14 @@ cmdname="$(basename "$0")"
 usage() {
   cat << USAGE >&2
 Usage:
-  $cmdname [-h] PORT FLASK_APP
+  $cmdname [-h][-p PORT][-f FLASK_APP]
 
   -h
         Show this help message
-
-  PORT: port to expose
-  FLASK_APP: environment variable value, points to flask entry point
+  -p
+	port to expose
+  -f
+	FLASK_APP environment variable value, points to flask entry point
 
   Commands to run within docker container.  Script exists to launch
   more than a single as generally desired by docker.
@@ -24,8 +25,19 @@ if [ "$1" = "-h" ]; then
   usage
 fi
 
-PORT=$1
-FLASK_APP=$2
+while getopts "hpb:" option; do
+  case "${option}" in
+    h)
+      usage
+      ;;
+    p)
+      PORT=${OPTARG}
+      ;;
+    f)
+      FLASK_APP="${OPTARG}"
+      ;;
+  esac
+done
 
 echo "initiate cron"
 cron -f &
