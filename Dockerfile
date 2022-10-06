@@ -25,4 +25,5 @@ ENV FLASK_APP=isacc_messaging.app:create_app() \
 
 EXPOSE "${PORT}"
 
-ENTRYPOINT ["/scripts/commands.sh", "${FLASK_APP}", "${PORT:-8000}"]
+ENTRYPOINT ["/scripts/commands.sh"]
+CMD ["8000", "isacc_messaging.app:create_app()"]
