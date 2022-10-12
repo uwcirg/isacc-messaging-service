@@ -2,6 +2,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+import isacc_messaging
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
 
@@ -99,8 +100,8 @@ def message_status_update():
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_status_update(request.values)
     if result is not None:
-        return ('', 204)
-    return ('', 500)
+        return '', 204
+    return '', 500
 
 
 @base_blueprint.route("/sms", methods=['GET','POST'])
@@ -108,22 +109,43 @@ def incoming_sms():
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_received(request.values)
     if result is not None:
-        return ('', 204)
-    return ('', 500)
+        return '', 204
+    return '', 500
 
 
 @base_blueprint.cli.command("execute_requests")
 def execute_requests_cli():
-    results = IsaccRecordCreator().execute_requests()
-    if results is not None:
-        print(f"Successfully generated Communication resources: {', '.join([c.id for c in results])}")
+    result = execute_requests()
+
+    if result is not None:
+        raise Exception(result)
+    return None
 
 
 @base_blueprint.route("/execute_requests", methods=['POST'])
 def execute_requests_route():
-    results = IsaccRecordCreator().execute_requests()
-    if results is not None:
-        return ('', 204)
-    return ('', 500)
+    result = execute_requests()
+
+    if result is not None:
+        return result, 500
+    return '', 204
 
 
+def execute_requests():
+    successes, errors = IsaccRecordCreator().execute_requests()
+
+    if len(successes) > 0:
+        isacc_messaging.audit.audit_entry(
+            f"Successfully executed CommunicationRequest resources: {', '.join(successes)}",
+            level='info'
+        )
+    if len(errors) > 0:
+        isacc_messaging.audit.audit_entry(
+            "Execution failed for CommunicationRequest resources",
+            extra={'failed_resources': errors},
+            level='error'
+        )
+        error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
+        return f"Execution failed for CommunicationRequest resources:\n{error_list}"
+
+    return None

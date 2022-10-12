@@ -8,7 +8,6 @@ from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from flask import current_app
 
-
 from isacc_messaging.api.fhir import HAPI_request
 
 
@@ -207,7 +206,7 @@ class IsaccRecordCreator:
             patient_id=pt.id
         )
 
-    def execute_requests(self) -> List[Communication]:
+    def execute_requests(self) -> tuple[List[str], List[dict]]:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
@@ -217,9 +216,14 @@ class IsaccRecordCreator:
             "occurrence": f"le{datetime.now().isoformat()[:16]}"
         })
 
-        results = []
+        successes = []
+        errors = []
         if result['resourceType'] == 'Bundle' and result['total'] > 0:
             for entry in result['entry']:
                 cr = entry['resource']
-                results.append(self.convert_communicationrequest_to_communication(cr=cr))
-        return results
+                try:
+                    self.convert_communicationrequest_to_communication(cr=cr)
+                    successes.append(cr['id'])
+                except Exception as e:
+                    errors.append({'id': cr['id'], 'error': e})
+        return successes, errors
