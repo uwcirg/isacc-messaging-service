@@ -102,6 +102,7 @@ class IsaccRecordCreator:
         #                                 "_sort": "-_lastUpdated"}).perform_resources(self.db.server)
         result = HAPI_request('GET', 'CarePlan', params={"subject": f"Patient/{patient_id}",
                                                          "category": "isacc-message-plan",
+                                                         "status": "active",
                                                          "_sort": "-_lastUpdated"})
         result = first_in_bundle(result)
         if result is not None:
