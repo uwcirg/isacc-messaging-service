@@ -77,12 +77,14 @@ class IsaccRecordCreator:
 
             return updated_cr
 
-    def send_twilio_sms(self, message, to_phone, from_phone='+12535183975'):
+    def send_twilio_sms(self, message, to_phone, from_phone=None):
         from twilio.rest import Client
         account_sid = current_app.config.get('TWILIO_ACCOUNT_SID')
         auth_token = current_app.config.get('TWILIO_AUTH_TOKEN')
+        if from_phone is None:
+            from_phone = current_app.config.get('TWILIO_PHONE_NUMBER')
 
-        webhook_callback = current_app.config.get('WEBHOOK_CALLBACK')
+        webhook_callback = current_app.config.get('TWILIO_WEBHOOK_CALLBACK')
 
         client = Client(account_sid, auth_token)
 
