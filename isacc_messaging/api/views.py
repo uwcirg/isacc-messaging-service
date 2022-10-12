@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
 
-base_blueprint = Blueprint('base', __name__)
+base_blueprint = Blueprint('base', __name__, cli_group=None)
 
 
 @base_blueprint.route('/')
@@ -112,6 +112,7 @@ def incoming_sms():
     return ('', 500)
 
 
+@base_blueprint.cli.command("execute_requests")
 @base_blueprint.route("/execute_requests", methods=['POST'])
 def execute_requests():
     record_creator = IsaccRecordCreator()
