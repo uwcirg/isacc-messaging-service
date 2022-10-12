@@ -113,11 +113,17 @@ def incoming_sms():
 
 
 @base_blueprint.cli.command("execute_requests")
+def execute_requests_cli():
+    results = IsaccRecordCreator().execute_requests()
+    if results is not None:
+        print(f"Successfully generated Communication resources: {', '.join([c.id for c in results])}")
+
+
 @base_blueprint.route("/execute_requests", methods=['POST'])
-def execute_requests():
-    record_creator = IsaccRecordCreator()
-    result = record_creator.execute_requests()
-    if result is not None:
+def execute_requests_route():
+    results = IsaccRecordCreator().execute_requests()
+    if results is not None:
         return ('', 204)
     return ('', 500)
+
 
