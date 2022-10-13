@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List
+from typing import List, Tuple
 
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
@@ -206,7 +206,7 @@ class IsaccRecordCreator:
             patient_id=pt.id
         )
 
-    def execute_requests(self) -> tuple[List[str], List[dict]]:
+    def execute_requests(self) -> Tuple[List[str], List[dict]]:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
