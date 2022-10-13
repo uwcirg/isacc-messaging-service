@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import List
 
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
@@ -6,7 +7,6 @@ from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from flask import current_app
-
 
 from isacc_messaging.api.fhir import HAPI_request
 
@@ -206,18 +206,24 @@ class IsaccRecordCreator:
             patient_id=pt.id
         )
 
-    def execute_requests(self):
+    def execute_requests(self) -> tuple[List[str], List[dict]]:
+        """
+        For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
+        """
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message",
             "status": "active",
             "occurrence": f"le{datetime.now().isoformat()[:16]}"
         })
+
+        successes = []
+        errors = []
         if result['resourceType'] == 'Bundle' and result['total'] > 0:
-            record_creator = IsaccRecordCreator()
             for entry in result['entry']:
                 cr = entry['resource']
                 try:
-                    result = record_creator.convert_communicationrequest_to_communication(cr=cr)
+                    self.convert_communicationrequest_to_communication(cr=cr)
+                    successes.append(cr['id'])
                 except Exception as e:
-                    print(f"CommunicationRequest/{cr['id']} could not be executed:", e)
-        return ('', 200)
+                    errors.append({'id': cr['id'], 'error': e})
+        return successes, errors
