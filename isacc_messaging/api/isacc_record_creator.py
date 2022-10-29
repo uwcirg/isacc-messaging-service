@@ -32,6 +32,10 @@ class IsaccRecordCreator:
         pass
 
     def __create_communication_from_request(self, cr):
+        if cr.category[0].coding[0].code == 'isacc-manually-sent-message':
+            code = 'isacc-manually-sent-message'
+        else:
+            code = "isacc-auto-sent-message"
         return {
             "resourceType": "Communication",
             "basedOn": [{"reference": f"CommunicationRequest/{cr.id}"}],
@@ -39,7 +43,7 @@ class IsaccRecordCreator:
             "category": [{
                 "coding": [{
                     "system": "https://isacc.app/CodeSystem/communication-type",
-                    "code": "isacc-auto-sent-message"
+                    "code": code
                 }]
             }],
 
@@ -104,6 +108,7 @@ class IsaccRecordCreator:
         #                                 "_sort": "-_lastUpdated"}).perform_resources(self.db.server)
         result = HAPI_request('GET', 'CarePlan', params={"subject": f"Patient/{patient_id}",
                                                          "category": "isacc-message-plan",
+                                                         "status": "active",
                                                          "_sort": "-_lastUpdated"})
         result = first_in_bundle(result)
         if result is not None:
@@ -211,7 +216,7 @@ class IsaccRecordCreator:
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
         result = HAPI_request('GET', 'CommunicationRequest', params={
-            "category": "isacc-scheduled-message",
+            "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
             "occurrence": f"le{datetime.now().isoformat()[:16]}"
         })
