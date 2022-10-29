@@ -32,6 +32,10 @@ class IsaccRecordCreator:
         pass
 
     def __create_communication_from_request(self, cr):
+        if cr.category[0].coding[0].code == 'isacc-manually-sent-message':
+            code = 'isacc-manually-sent-message'
+        else:
+            code = "isacc-auto-sent-message"
         return {
             "resourceType": "Communication",
             "basedOn": [{"reference": f"CommunicationRequest/{cr.id}"}],
@@ -39,7 +43,7 @@ class IsaccRecordCreator:
             "category": [{
                 "coding": [{
                     "system": "https://isacc.app/CodeSystem/communication-type",
-                    "code": "isacc-auto-sent-message"
+                    "code": code
                 }]
             }],
 
@@ -207,7 +211,7 @@ class IsaccRecordCreator:
 
     def execute_requests(self):
         result = HAPI_request('GET', 'CommunicationRequest', params={
-            "category": "isacc-scheduled-message",
+            "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
             "occurrence": f"le{datetime.now().isoformat()[:16]}"
         })
