@@ -97,6 +97,12 @@ def convert_communicationrequest_to_communication(cr_id):
 
 @base_blueprint.route("/MessageStatus", methods=['POST'])
 def message_status_update():
+    isacc_messaging.audit.audit_entry(
+        f"Call to /MessageStatus webhook",
+        extra={'request.values': dict(request.values)},
+        level='info'
+    )
+
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_status_update(request.values)
     if result is not None:

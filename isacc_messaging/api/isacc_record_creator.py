@@ -8,6 +8,7 @@ from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from flask import current_app
 
+import isacc_messaging
 from isacc_messaging.api.fhir import HAPI_request
 
 
@@ -66,6 +67,17 @@ class IsaccRecordCreator:
             raise IsaccFhirException("No CommunicationRequest")
 
         cr = CommunicationRequest(cr)
+        if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"])>0:
+            twilio_messages = [i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
+            isacc_messaging.audit.audit_entry(
+                f"CommunicationRequest already has Twilio SID ",
+                extra={
+                    'CommunicationRequest': cr.id,
+                    "Twilio messages": twilio_messages
+                },
+                level='info'
+            )
+            return None
 
         target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
         result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
@@ -75,9 +87,17 @@ class IsaccRecordCreator:
         else:
             if not cr.identifier:
                 cr.identifier = []
-            cr.identifier.append(Identifier({"system": "http://isacc.app/twilio-message-sid", "value": result.sid}))
+            cr.identifier.append(Identifier({
+                "system": "http://isacc.app/twilio-message-sid",
+                "value": result.sid,
+                "extension": [{"url": "http://isacc.app/twilio-message-status", "valueCode": result.status}]
+            }))
             updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
-            print(updated_cr)
+            isacc_messaging.audit.audit_entry(
+                f"Updated CommunicationRequest with Twilio SID:",
+                extra={"resource": updated_cr},
+                level='info'
+            )
 
             return updated_cr
 
@@ -170,33 +190,46 @@ class IsaccRecordCreator:
         message_sid = values.get('MessageSid', None)
         message_status = values.get('MessageStatus', None)
 
-        if message_status == 'sent':
-            cr = HAPI_request('GET', 'CommunicationRequest', params={
-                "identifier": f"http://isacc.app/twilio-message-sid|{message_sid}"
-            })
-            cr = first_in_bundle(cr)
-            if cr is None:
-                return None
+        cr = HAPI_request('GET', 'CommunicationRequest', params={
+            "identifier": f"http://isacc.app/twilio-message-sid|{message_sid}"
+        })
+        cr = first_in_bundle(cr)
+        if cr is None:
+            return None
 
-            cr = CommunicationRequest(cr)
+        cr = CommunicationRequest(cr)
+        new_c = None
+        # update the message status in the identifier/extension attributes
+        for i in cr.identifier:
+            if i.system == "http://isacc.app/twilio-message-sid" and i.value == message_sid:
+                for e in i.extension:
+                    if e.url == "http://isacc.app/twilio-message-status":
+                        e.valueCode = message_status
+
+        if message_status == 'delivered':
             c = self.__create_communication_from_request(cr)
             c = Communication(c)
 
-            print("Creating resource: ")
-            print(c.as_json())
-            # result = c.create(self.db.server)
-            result = HAPI_request('POST', 'Communication', resource=c.as_json())
-            print("Created resource: ")
-            print(result)
+            new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
+            isacc_messaging.audit.audit_entry(
+                f"Created Communication resource:",
+                extra={"resource": new_c},
+                level='info'
+            )
 
             cr.status = "completed"
-            updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
-            print("Updated request object with status complete: ")
-            print(updated_cr)
-            # print(cr.update(self.db.server))
-            print()
 
-            return result
+        updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
+
+        isacc_messaging.audit.audit_entry(
+            f"Updated CommunicationRequest due to twilio status update:",
+            extra={"resource": updated_cr},
+            level='info'
+        )
+
+        if new_c:
+            return new_c
+        return updated_cr
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
@@ -218,7 +251,7 @@ class IsaccRecordCreator:
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
-            "occurrence": f"le{datetime.now().isoformat()[:16]}"
+            "occurrence": f"le{datetime.now().astimezone().isoformat()}"
         })
 
         successes = []
