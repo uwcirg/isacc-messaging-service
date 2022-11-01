@@ -206,7 +206,7 @@ class IsaccRecordCreator:
                     if e.url == "http://isacc.app/twilio-message-status":
                         e.valueCode = message_status
 
-        if message_status == 'delivered':
+        if message_status == 'sent':
             c = self.__create_communication_from_request(cr)
             c = Communication(c)
 
