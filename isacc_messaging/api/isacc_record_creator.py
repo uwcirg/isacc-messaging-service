@@ -67,7 +67,7 @@ class IsaccRecordCreator:
             raise IsaccFhirException("No CommunicationRequest")
 
         cr = CommunicationRequest(cr)
-        if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"])>0:
+        if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
             twilio_messages = [i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
             isacc_messaging.audit.audit_entry(
                 f"CommunicationRequest already has Twilio SID ",
@@ -83,6 +83,11 @@ class IsaccRecordCreator:
         result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
 
         if result.status != 'sent' and result.status != 'queued':
+            isacc_messaging.audit.audit_entry(
+                f"Twilio error",
+                extra={"resource": result},
+                level='error'
+            )
             raise IsaccTwilioError(f"ERROR! Message status is neither sent nor queued. It was {result.status}")
         else:
             if not cr.identifier:
@@ -117,15 +122,16 @@ class IsaccRecordCreator:
             from_=from_phone,
             to=to_phone,
             status_callback=webhook_callback + '/MessageStatus'
+            # ,media_url=['https://demo.twilio.com/owl.png']
         )
-
-        print("Message created:", message)
+        isacc_messaging.audit.audit_entry(
+            f"Twilio message created via API",
+            extra={"twilio_message": message},
+            level='info'
+        )
         return message
 
     def get_careplan(self, patient_id):
-        # result = CarePlan.where(struct={"subject": f"Patient/{patientId}",
-        #                                 "category": "isacc-message-plan",
-        #                                 "_sort": "-_lastUpdated"}).perform_resources(self.db.server)
         result = HAPI_request('GET', 'CarePlan', params={"subject": f"Patient/{patient_id}",
                                                          "category": "isacc-message-plan",
                                                          "status": "active",
@@ -134,7 +140,6 @@ class IsaccRecordCreator:
         if result is not None:
             return CarePlan(result)
         else:
-            print("no careplans found")
             return None
 
     def get_caring_contacts_phone_number(self, patient_id):
@@ -149,15 +154,24 @@ class IsaccRecordCreator:
     def generate_incoming_message(self, message, time: datetime = None, patient_id=None, priority=None, themes=None,
                                   twilio_sid=None):
         if priority is not None and priority != "routine" and priority != "urgent" and priority != "stat":
-            raise ValueError(f"Invalid priority given: {priority}. Only routine, urgent, and stat are allowed.")
+            return f"Invalid priority given: {priority}. Only routine, urgent, and stat are allowed."
 
         if priority is None:
             priority = "routine"
 
         if patient_id is None:
-            raise ValueError("Need patient ID")
+            return "Need patient ID"
 
         care_plan = self.get_careplan(patient_id)
+
+        if not care_plan:
+            error = "No CarePlan for this patient:"
+            isacc_messaging.audit.audit_entry(
+                error,
+                extra={"patient ID": patient_id},
+                level='error'
+            )
+            return f"{error}: Patient/{patient_id}"
 
         if time is None:
             time = datetime.now()
@@ -184,7 +198,11 @@ class IsaccRecordCreator:
         }
         c = Communication(m)
         result = HAPI_request('POST', 'Communication', resource=c.as_json())
-        print(result)
+        isacc_messaging.audit.audit_entry(
+            f"Created Communication resource for incoming text",
+            extra={"resource": result},
+            level='info'
+        )
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
@@ -195,10 +213,16 @@ class IsaccRecordCreator:
         })
         cr = first_in_bundle(cr)
         if cr is None:
-            return None
+            error = "No CommunicationRequest for this Twilio SID"
+            isacc_messaging.audit.audit_entry(
+                error,
+                extra={"message_sid": message_sid},
+                level='error'
+            )
+            return f"{error}: {message_sid}"
 
         cr = CommunicationRequest(cr)
-        new_c = None
+
         # update the message status in the identifier/extension attributes
         for i in cr.identifier:
             if i.system == "http://isacc.app/twilio-message-sid" and i.value == message_sid:
@@ -227,17 +251,25 @@ class IsaccRecordCreator:
             level='info'
         )
 
-        if new_c:
-            return new_c
-        return updated_cr
+        return None
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
             'telecom': values.get('From').replace("+1", "")
         })
-        pt = Patient(first_in_bundle(pt))
+        pt = first_in_bundle(pt)
+        if not pt:
+            error = "No patient with this phone number"
+            phone = values.get('From')
+            isacc_messaging.audit.audit_entry(
+                error,
+                extras={"from_phone": phone},
+                level='error'
+            )
+            return f"{error}: {phone}"
+        pt = Patient(pt)
 
-        self.generate_incoming_message(
+        return self.generate_incoming_message(
             message=values.get("Body"),
             time=datetime.now(),
             twilio_sid=values.get('SmsSid'),
