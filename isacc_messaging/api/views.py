@@ -99,6 +99,12 @@ def message_status_update():
 
 @base_blueprint.route("/sms", methods=['GET','POST'])
 def incoming_sms():
+    isacc_messaging.audit.audit_entry(
+        f"Call to /sms webhook",
+        extra={'request.values': dict(request.values)},
+        level='info'
+    )
+
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_received(request.values)
     if result is not None:
