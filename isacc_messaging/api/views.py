@@ -82,19 +82,6 @@ def auditlog_addevent():
     return jsonify(message='ok')
 
 
-@base_blueprint.route('/convert', methods=('POST',))
-def convert():
-    cr_id = request.form['cr']
-    result = convert_communicationrequest_to_communication(cr_id)
-    return result
-
-
-def convert_communicationrequest_to_communication(cr_id):
-    record_creator = IsaccRecordCreator()
-    result = record_creator.convert_communicationrequest_to_communication(cr_id=cr_id)
-    return result
-
-
 @base_blueprint.route("/MessageStatus", methods=['POST'])
 def message_status_update():
     isacc_messaging.audit.audit_entry(
@@ -106,17 +93,23 @@ def message_status_update():
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_status_update(request.values)
     if result is not None:
-        return '', 204
-    return '', 500
+        return '', 500
+    return '', 204
 
 
 @base_blueprint.route("/sms", methods=['GET','POST'])
 def incoming_sms():
+    isacc_messaging.audit.audit_entry(
+        f"Call to /sms webhook",
+        extra={'request.values': dict(request.values)},
+        level='info'
+    )
+
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_received(request.values)
     if result is not None:
-        return '', 204
-    return '', 500
+        return '', 500
+    return '', 204
 
 
 @base_blueprint.cli.command("execute_requests")
