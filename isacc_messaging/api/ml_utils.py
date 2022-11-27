@@ -75,8 +75,7 @@ def predict(model, dataloader):
     return sigmoid(predictions)
 
 def get_device(index=0):
-    if torch.cuda.is_available() and ('USE_CPU' not in os.environ or not os.environ['USE_CPU']):
-        # Tell PyTorch to use the GPU.
+    if torch.cuda.is_available():
         print('There are %d GPU(s) available.' % torch.cuda.device_count())
         print('We will use the GPU:', torch.cuda.get_device_name(index), "at index:", index)
         return torch.device(index)
