@@ -10,6 +10,7 @@ from flask import current_app
 
 import isacc_messaging
 from isacc_messaging.api.fhir import HAPI_request
+from isacc_messaging.api.ml_utils import predict_score
 
 
 class IsaccFhirException(Exception):
@@ -269,12 +270,31 @@ class IsaccRecordCreator:
             return f"{error}: {phone}"
         pt = Patient(pt)
 
+        message = values.get("Body")
+        message_priority = self.score_message(message)
+
         return self.generate_incoming_message(
-            message=values.get("Body"),
+            message=message,
             time=datetime.now(),
             twilio_sid=values.get('SmsSid'),
-            patient_id=pt.id
+            patient_id=pt.id,
+            priority=message_priority
         )
+
+    def score_message(self, message):
+        try:
+            model_path = current_app.config.get('TORCH_MODEL_PATH')
+            score = predict_score(message, model_path)
+            if score == 1:
+                return "stat"
+        except Exception as e:
+            isacc_messaging.audit.audit_entry(
+                "Failed to assess message urgency",
+                extra={"exception": e},
+                level='error'
+            )
+        return "routine"
+
 
     def execute_requests(self) -> Tuple[List[str], List[dict]]:
         """
