@@ -206,30 +206,43 @@ class IsaccRecordCreator:
                     if e.url == "http://isacc.app/twilio-message-status":
                         e.valueCode = message_status
 
-        if message_status == 'sent':
-            c = self.__create_communication_from_request(cr)
-            c = Communication(c)
+        # sometimes we go straight to delivered. other times we go to sent and then delivered. sometimes we go to sent
+        # and never delivered (it has been delivered but we don't get a callback with that status)
+        if message_status == 'sent' or message_status == 'delivered':
+            existing_comm = first_in_bundle(HAPI_request('GET', 'Communication', params={
+                'based-on': f"CommunicationRequest/{cr.id}"
+            }))
+            if existing_comm is None:
+                c = self.__create_communication_from_request(cr)
+                c = Communication(c)
 
-            new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
-            isacc_messaging.audit.audit_entry(
-                f"Created Communication resource:",
-                extra={"resource": new_c},
-                level='info'
-            )
+                new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
+                isacc_messaging.audit.audit_entry(
+                    f"Created Communication resource:",
+                    extra={"resource": new_c},
+                    level='info'
+                )
+            else:
+                isacc_messaging.audit.audit_entry(
+                    f"Received /MessageStatus callback with status {message_status} but Communication resource already "
+                    f"exists:",
+                    extra={"resource": existing_comm},
+                    level='info'
+                )
 
             cr.status = "completed"
 
-        updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
+            cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
 
-        isacc_messaging.audit.audit_entry(
-            f"Updated CommunicationRequest due to twilio status update:",
-            extra={"resource": updated_cr},
-            level='info'
-        )
+            isacc_messaging.audit.audit_entry(
+                f"Updated CommunicationRequest due to twilio status update:",
+                extra={"resource": cr},
+                level='info'
+            )
 
         if new_c:
             return new_c
-        return updated_cr
+        return cr
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
