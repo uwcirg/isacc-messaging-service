@@ -6,6 +6,7 @@ from fhirclient.models.communication import Communication
 from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
+from fhirclient.models.extension import Extension
 from flask import current_app
 
 import isacc_messaging
@@ -143,6 +144,13 @@ class IsaccRecordCreator:
         else:
             return None
 
+    def get_patient(self, patient_id):
+        result = HAPI_request('GET', 'Patient', resource_id=patient_id)
+        if result is not None:
+            return Patient(result)
+        else:
+            return None
+
     def get_caring_contacts_phone_number(self, patient_id):
         pt = HAPI_request('GET', 'Patient', patient_id)
         pt = Patient(pt)
@@ -180,6 +188,7 @@ class IsaccRecordCreator:
         if themes is None:
             themes = []
 
+        message_time = time.astimezone().isoformat()
         m = {
             'resourceType': 'Communication',
             'identifier': [{"system": "http://isacc.app/twilio-message-sid", "value": twilio_sid}],
@@ -189,7 +198,7 @@ class IsaccRecordCreator:
                                       'code': 'isacc-received-message'}]}],
             'medium': [{'coding': [{'system': 'http://terminology.hl7.org/ValueSet/v3-ParticipationMode',
                                     'code': 'SMSWRIT'}]}],
-            'sent': time.astimezone().isoformat(),
+            'sent': message_time,
             'sender': {'reference': f'Patient/{patient_id}'},
             'payload': [{'contentString': message}],
             'priority': priority,
@@ -204,6 +213,8 @@ class IsaccRecordCreator:
             extra={"resource": result},
             level='info'
         )
+
+        self.update_followup_extension(patient_id, message_time)
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
@@ -247,6 +258,9 @@ class IsaccRecordCreator:
                     extra={"resource": new_c},
                     level='info'
                 )
+                # if this was a manual message, mark patient as having been followed up with
+                if self.is_manual_follow_up_message(c):
+                    self.mark_patient_followed_up(patient_id=cr.recipient[0].reference.split('/')[1])
             else:
                 isacc_messaging.audit.audit_entry(
                     f"Received /MessageStatus callback with status {message_status} but Communication resource already "
@@ -267,6 +281,29 @@ class IsaccRecordCreator:
 
         return None
 
+    def mark_patient_followed_up(self, patient_id):
+        self.update_followup_extension(patient_id=patient_id, value_date_time=None)
+
+    def update_followup_extension(self, patient_id, value_date_time):
+        patient = self.get_patient(patient_id)
+        if value_date_time is None and patient.extension is not None:
+            patient.extension = [i for i in patient.extension if
+                                 i.url != "http://isacc.app/time-of-last-unfollowedup-message"]
+        else:
+            if patient.extension is None:
+                patient.extension = []
+            patient.extension.append(Extension({
+                "url": "http://isacc.app/time-of-last-unfollowedup-message",
+                "valueDateTime": value_date_time
+            }))
+
+        result = HAPI_request('PUT', 'Patient', resource_id=patient_id, resource=patient.as_json())
+        isacc_messaging.audit.audit_entry(
+            f"Updated Patient resource with value for extension",
+            extra={"resource": result},
+            level='info'
+        )
+
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
             'telecom': values.get('From').replace("+1", "")
@@ -277,7 +314,7 @@ class IsaccRecordCreator:
             phone = values.get('From')
             isacc_messaging.audit.audit_entry(
                 error,
-                extras={"from_phone": phone},
+                extra={"from_phone": phone},
                 level='error'
             )
             return f"{error}: {phone}"
@@ -308,7 +345,6 @@ class IsaccRecordCreator:
             )
         return "routine"
 
-
     def execute_requests(self) -> Tuple[List[str], List[dict]]:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
@@ -330,3 +366,11 @@ class IsaccRecordCreator:
                 except Exception as e:
                     errors.append({'id': cr['id'], 'error': e})
         return successes, errors
+
+    def is_manual_follow_up_message(self, c: Communication) -> bool:
+        for category in c.category:
+            for coding in category.coding:
+                if coding.system == 'https://isacc.app/CodeSystem/communication-type':
+                    if coding.code == 'isacc-manually-sent-message':
+                        return True
+        return False
