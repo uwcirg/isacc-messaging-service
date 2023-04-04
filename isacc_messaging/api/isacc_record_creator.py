@@ -8,9 +8,11 @@ from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from fhirclient.models.extension import Extension
+from fhirclient.models.practitioner import Practitioner
 from flask import current_app
 
 import isacc_messaging
+from isacc_messaging.api.email_notifications import send_message_received_notification
 from isacc_messaging.api.fhir import HAPI_request
 from isacc_messaging.api.ml_utils import predict_score
 
@@ -134,7 +136,14 @@ class IsaccRecordCreator:
         )
         return message
 
-    def get_careplan(self, patient_id):
+    def get_patient(self, patient_id) -> Patient:
+        result = HAPI_request('GET', 'Patient', patient_id)
+        if result is not None:
+            return Patient(result)
+        else:
+            return None
+
+    def get_careplan(self, patient_id) -> CarePlan:
         result = HAPI_request('GET', 'CarePlan', params={"subject": f"Patient/{patient_id}",
                                                          "category": "isacc-message-plan",
                                                          "status": "active",
@@ -152,9 +161,20 @@ class IsaccRecordCreator:
         else:
             return None
 
+    def get_general_practitioner_emails(self, pt: Patient) -> list:
+        emails = []
+        if pt and pt.generalPractitioner:
+            for gp_ref in pt.generalPractitioner:
+                result = HAPI_request('GET', 'Practitioner', gp_ref.id)
+                if result is not None:
+                    gp = Practitioner(result)
+                    for t in gp.telecom:
+                        if t.system == 'email':
+                            emails.append(t.value)
+        return emails
+
     def get_caring_contacts_phone_number(self, patient_id):
-        pt = HAPI_request('GET', 'Patient', patient_id)
-        pt = Patient(pt)
+        pt = self.get_patient(patient_id)
         if pt.telecom:
             for t in pt.telecom:
                 if t.system == 'sms':
@@ -214,6 +234,10 @@ class IsaccRecordCreator:
             extra={"resource": result},
             level='info'
         )
+        patient = self.get_patient(patient_id)
+        notify_emails = self.get_general_practitioner_emails(patient)
+        patient_name = " ".join([f"{' '.join(n.given)} {n.family}" for n in patient.name])
+        send_message_received_notification(notify_emails, message, patient_name)
 
         self.update_followup_extension(patient_id, message_time)
 
