@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Tuple
 
+from urllib.parse import parse_qs, urlsplit
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
 from fhirclient.models.communicationrequest import CommunicationRequest
@@ -70,7 +71,7 @@ class IsaccRecordCreator:
 
         cr = CommunicationRequest(cr)
         if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
-            twilio_messages = [i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
+            twilio_messages = [i.value for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
             isacc_messaging.audit.audit_entry(
                 f"CommunicationRequest already has Twilio SID ",
                 extra={
@@ -349,14 +350,30 @@ class IsaccRecordCreator:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
+        successes = []
+        errors = []
+
+        limit = 200
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
-            "occurrence": f"le{datetime.now().astimezone().isoformat()}"
+            "occurrence": f"le{datetime.now().astimezone().isoformat()}",
+            "_count": str(limit)
         })
 
-        successes = []
-        errors = []
+        self.process_bundle(errors, result, successes)
+
+        if result["total"] > limit:
+            while len([link['url'] for link in result["link"] if link['relation'] == 'next']) > 0:
+                next_page_url = [link['url'] for link in result["link"] if link['relation'] == 'next'][0]
+                next_page_url = urlsplit(next_page_url)
+                params = parse_qs(next_page_url.query)
+                result = HAPI_request('GET', '', params=params)
+                self.process_bundle(errors, result, successes)
+
+        return successes, errors
+
+    def process_bundle(self, errors, result, successes):
         if result['resourceType'] == 'Bundle' and result['total'] > 0:
             for entry in result['entry']:
                 cr = entry['resource']
@@ -365,7 +382,6 @@ class IsaccRecordCreator:
                     successes.append(cr['id'])
                 except Exception as e:
                     errors.append({'id': cr['id'], 'error': e})
-        return successes, errors
 
     def is_manual_follow_up_message(self, c: Communication) -> bool:
         for category in c.category:
