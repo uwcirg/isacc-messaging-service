@@ -167,6 +167,8 @@ class IsaccRecordCreator:
             for gp_ref in pt.generalPractitioner:
                 result = HAPI_request('GET', 'Practitioner', gp_ref.id)
                 if result is not None:
+                    if result.get('resourceType') == 'Bundle':
+                        result = first_in_bundle(result)
                     gp = Practitioner(result)
                     for t in gp.telecom:
                         if t.system == 'email':
