@@ -16,6 +16,9 @@ from isacc_messaging.api.email_notifications import send_message_received_notifi
 from isacc_messaging.api.fhir import HAPI_request
 from isacc_messaging.api.ml_utils import predict_score
 
+def debug(s):
+    with open("/tmp/fromserver", "a", encoding="utf-8") as f:
+        f.write(s + "\n")
 
 class IsaccFhirException(Exception):
     """Raised when a FHIR resource or attribute required for ISACC to operate correctly is missing"""
@@ -68,6 +71,7 @@ class IsaccRecordCreator:
     def convert_communicationrequest_to_communication(self, cr_id=None, cr=None):
         if cr is None and cr_id is not None:
             cr = HAPI_request('GET', 'CommunicationRequest', cr_id)
+            isacc_messaging.audit.audit_entry(f"convert cr_id {cr_id}", level='debug')
         if cr is None:
             raise IsaccFhirException("No CommunicationRequest")
 
@@ -75,15 +79,16 @@ class IsaccRecordCreator:
         if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
             twilio_messages = [i.value for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
             isacc_messaging.audit.audit_entry(
-                f"CommunicationRequest already has Twilio SID ",
+                f"CommunicationRequest already has Twilio SID -> {cr.id} {twilio_messages} <-",
                 extra={
                     'CommunicationRequest': cr.id,
                     "Twilio messages": twilio_messages
                 },
-                level='info'
+                level='debug'
             )
             return None
 
+        isacc_messaging.audit.audit_entry(f"attempt send cr_id {cr_id}", level='debug')
         target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
         result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
 
@@ -163,16 +168,26 @@ class IsaccRecordCreator:
 
     def get_general_practitioner_emails(self, pt: Patient) -> list:
         emails = []
+        debug("get emails")
         if pt and pt.generalPractitioner:
             for gp_ref in pt.generalPractitioner:
-                result = HAPI_request('GET', 'Practitioner', gp_ref.id)
+                # format of gp_ref.reference: "Practitioner/2"
+                resource_type, resource_id = gp_ref.reference.split('/')
+                result = HAPI_request('GET', resource_type, resource_id)
                 if result is not None:
-                    if result.get('resourceType') == 'Bundle':
-                        result = first_in_bundle(result)
+                    if resource_type != 'Practitioner':
+                        raise ValueError(f"expected Practitioner in {gp_ref.reference}")
                     gp = Practitioner(result)
                     for t in gp.telecom:
                         if t.system == 'email':
                             emails.append(t.value)
+        if not emails:
+            isacc_messaging.audit.audit_entry(
+                "no practioner email to notify",
+                extra={"Patient": str(pt)},
+                level='debug'
+            )
+        debug(f"got {' '.join(emails)}") 
         return emails
 
     def get_caring_contacts_phone_number(self, patient_id):
@@ -185,7 +200,7 @@ class IsaccRecordCreator:
 
     def generate_incoming_message(self, message, time: datetime = None, patient_id=None, priority=None, themes=None,
                                   twilio_sid=None):
-        if priority is not None and priority != "routine" and priority != "urgent" and priority != "stat":
+        if priority and priority not in ("routine", "urgent", "stat"):
             return f"Invalid priority given: {priority}. Only routine, urgent, and stat are allowed."
 
         if priority is None:
@@ -238,8 +253,34 @@ class IsaccRecordCreator:
         )
         patient = self.get_patient(patient_id)
         notify_emails = self.get_general_practitioner_emails(patient)
+        debug("generated notify emails")
+        isacc_messaging.audit.audit_entry(
+            f"Generated notify emails",
+            extra={"number emails": len(notify_emails),
+                   "patient_name": patient.name},
+            level='debug'
+        )
         patient_name = " ".join([f"{' '.join(n.given)} {n.family}" for n in patient.name])
+        isacc_messaging.audit.audit_entry(
+            f"notify_emails {notify_emails}",
+            extra={"patient_name": patient_name},
+            level='info'
+        )
+        isacc_messaging.audit.audit_entry(
+            f"attempt send received notification",
+            extra={"patient_name": patient_name,
+                   "mesg": message,
+                   "notify_emails": notify_emails},
+            level='info'
+        )
         send_message_received_notification(notify_emails, message, patient_name)
+        isacc_messaging.audit.audit_entry(
+            f"survived send received notification",
+            extra={"patient_name": patient_name,
+                   "mesg": message,
+                   "notify_emails": notify_emails},
+            level='info'
+        )
 
         self.update_followup_extension(patient_id, message_time)
 
@@ -290,9 +331,10 @@ class IsaccRecordCreator:
                     self.mark_patient_followed_up(patient_id=cr.recipient[0].reference.split('/')[1])
             else:
                 isacc_messaging.audit.audit_entry(
-                    f"Received /MessageStatus callback with status {message_status} but Communication resource already "
-                    f"exists:",
-                    extra={"resource": existing_comm},
+                    f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
+                    extra={"resource": existing_comm,
+                           "existing status": existing_comm.status,
+                           "message status": message_status},
                     level='info'
                 )
 
@@ -359,8 +401,11 @@ class IsaccRecordCreator:
         )
 
     def score_message(self, message):
+        model_path = current_app.config.get('TORCH_MODEL_PATH')
+        if not model_path:
+            return "routine"
+
         try:
-            model_path = current_app.config.get('TORCH_MODEL_PATH')
             score = predict_score(message, model_path)
             if score == 1:
                 return "stat"

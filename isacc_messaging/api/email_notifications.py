@@ -7,8 +7,12 @@ from flask import current_app
 
 import isacc_messaging
 
+def debug(s):
+    with open("/tmp/fromserver", "a", encoding="utf-8") as f:
+        f.write(s + "\n")
 
 def send_message_received_notification(recipients: list, patient_message, patient_name):
+    debug("in send_message")
     port = current_app.config.get('EMAIL_PORT')  # For SSL
     email_server = current_app.config.get('EMAIL_SERVER')
     email = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_ADDRESS')
@@ -31,6 +35,16 @@ def send_message_received_notification(recipients: list, patient_message, patien
         """
 
     suppress_send = current_app.config.get('MAIL_SUPPRESS_SEND')
+    isacc_messaging.audit.audit_entry(
+        f"Email notification SUPPRESSED",
+        extra={
+            'subject': subject,
+            'email_message': text,
+            'recipients': recipients
+        },
+        level='debug'
+    )
+    debug("done with send_message")
     if not suppress_send:
         send_email(
             recipient_emails=recipients,

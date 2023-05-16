@@ -87,7 +87,7 @@ def message_status_update():
     isacc_messaging.audit.audit_entry(
         f"Call to /MessageStatus webhook",
         extra={'request.values': dict(request.values)},
-        level='info'
+        level='debug'
     )
 
     record_creator = IsaccRecordCreator()
@@ -97,18 +97,57 @@ def message_status_update():
     return '', 204
 
 
+def debug(s):
+    with open("/tmp/debug.log", "a", encoding="utf-8") as f:
+        f.write(s + "\n")
+
+
 @base_blueprint.route("/sms", methods=['GET','POST'])
 def incoming_sms():
     isacc_messaging.audit.audit_entry(
         f"Call to /sms webhook",
         extra={'request.values': dict(request.values)},
-        level='info'
+        level='debug'
+    )
+    try:
+        debug("on sms received")
+        record_creator = IsaccRecordCreator()
+        result = record_creator.on_twilio_message_received(request.values)
+        debug("done with sms received")
+    except Exception as e:
+        debug(f"caught {e}")
+        import traceback, sys
+        exc = sys.exc_info()[0]
+        stack = traceback.extract_statck()
+        trc = "Traceback (most recent call last):\n"
+        debug(f"trc {trc}")
+        stackstr = trc + "-->".join(traceback.format_list(stack))
+        if exc is not None:
+            stackstr += "  " + traceback.format_exc().lstrip(trc)
+        debug(f"stackstr {stackstr}")
+        isacc_messaging.audit.audit_entry(
+            f"on_twilio_message_received generated: {stackstr}",
+            level="error")
+        result = str(e)
+        return stackstr, 500
+    if result is not None:
+        debug(f"result: {result}")
+        isacc_messaging.audit.audit_entry(
+            f"on_twilio_message_received generated error {result}",
+            level='error')
+        return '', 500
+    debug(f"all happy!")
+    return '', 204
+
+
+@base_blueprint.route("/sms-handler", methods=['GET','POST'])
+def incoming_sms_handler():
+    isacc_messaging.audit.audit_entry(
+        f"Received call to /sms-handler webhook (not desired)",
+        extra={'request.values': dict(request.values)},
+        level='warn'
     )
 
-    record_creator = IsaccRecordCreator()
-    result = record_creator.on_twilio_message_received(request.values)
-    if result is not None:
-        return '', 500
     return '', 204
 
 
@@ -139,12 +178,12 @@ def execute_requests():
             level='info'
         )
     if len(errors) > 0:
+        error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
         isacc_messaging.audit.audit_entry(
-            "Execution failed for CommunicationRequest resources",
-            extra={'failed_resources': errors},
+            "Execution failed for CommunicationRequest resources:",
+            extra={'failed_resources': error_list},
             level='error'
         )
-        error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
         return f"Execution failed for CommunicationRequest resources:\n{error_list}"
 
     return None
