@@ -66,7 +66,10 @@ def auditlog_addevent():
       - ServiceToken: []
 
     """
-    body = request.get_json()
+    body = None
+    if request.data:
+        body = request.get_json()
+
     if not body:
         return jsonify(message="Missing JSON data"), 400
 
@@ -87,13 +90,13 @@ def message_status_update():
     isacc_messaging.audit.audit_entry(
         f"Call to /MessageStatus webhook",
         extra={'request.values': dict(request.values)},
-        level='info'
+        level='debug'
     )
 
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_status_update(request.values)
     if result is not None:
-        return '', 500
+        return result, 500
     return '', 204
 
 
@@ -102,13 +105,38 @@ def incoming_sms():
     isacc_messaging.audit.audit_entry(
         f"Call to /sms webhook",
         extra={'request.values': dict(request.values)},
-        level='info'
+        level='debug'
     )
-
-    record_creator = IsaccRecordCreator()
-    result = record_creator.on_twilio_message_received(request.values)
+    try:
+        record_creator = IsaccRecordCreator()
+        result = record_creator.on_twilio_message_received(request.values)
+    except Exception as e:
+        import traceback, sys
+        exc = sys.exc_info()[0]
+        stack = traceback.extract_statck()
+        trc = "Traceback (most recent call last):\n"
+        stackstr = trc + "-->".join(traceback.format_list(stack))
+        if exc is not None:
+            stackstr += "  " + traceback.format_exc().lstrip(trc)
+        isacc_messaging.audit.audit_entry(
+            f"on_twilio_message_received generated: {stackstr}",
+            level="error")
+        return stackstr, 500
     if result is not None:
-        return '', 500
+        isacc_messaging.audit.audit_entry(
+            f"on_twilio_message_received generated error {result}",
+            level='error')
+        return result, 500
+    return '', 204
+
+
+@base_blueprint.route("/sms-handler", methods=['GET','POST'])
+def incoming_sms_handler():
+    isacc_messaging.audit.audit_entry(
+        f"Received call to /sms-handler webhook (not desired)",
+        extra={'request.values': dict(request.values)},
+        level='warn'
+    )
     return '', 204
 
 
@@ -118,7 +146,6 @@ def execute_requests_cli():
 
     if result is not None:
         raise Exception(result)
-    return None
 
 
 @base_blueprint.route("/execute_requests", methods=['POST'])
@@ -139,12 +166,10 @@ def execute_requests():
             level='info'
         )
     if len(errors) > 0:
+        error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
         isacc_messaging.audit.audit_entry(
-            "Execution failed for CommunicationRequest resources",
-            extra={'failed_resources': errors},
+            "Execution failed for CommunicationRequest resources:",
+            extra={'failed_resources': error_list},
             level='error'
         )
-        error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
         return f"Execution failed for CommunicationRequest resources:\n{error_list}"
-
-    return None

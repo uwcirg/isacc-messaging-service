@@ -4,6 +4,7 @@ functions to simplify adding context and extra data to log messages destined for
 """
 from copy import deepcopy
 from flask import current_app, has_app_context
+import json
 import logging
 
 from isacc_messaging.logserverhandler import LogServerHandler
@@ -30,6 +31,16 @@ def audit_entry(message, level='info', extra=None):
 
     if extra is None:
         extra = {}
+
+    # confirm extra can be formatted as JSON (otherwise silently disappears)
+    try:
+        json.dumps(extra)
+    except TypeError:
+        extra = {'PROBLEM encoding': f"{extra}"}
+        try:
+            json.dumps(extra)
+        except TypeError:
+            extra = {"PROBLEM encoding": "unable to encode"}
 
     if has_app_context():
         if 'version' not in extra:
