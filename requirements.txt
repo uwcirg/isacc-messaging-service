@@ -11,6 +11,7 @@ charset-normalizer==2.0.6  # via requests
 click==8.0.1              # via flask
 cryptography==3.3.2         # via authlib, python-jose
 ecdsa==0.14.1             # via python-jose
+fhirclient==4.1.0         # via isacc_messaging (setup.py)
 flask==1.1.2              # via isacc_messaging (setup.py)
 gunicorn==20.1.0          # via isacc_messaging (setup.py)
 idna==3.2                 # via requests
@@ -32,3 +33,10 @@ url-normalize==1.4.3      # via requests-cache
 urllib3==1.26.7           # via requests, requests-cache
 werkzeug==2.0.1           # via flask
 zipp==3.5.0               # via importlib-metadata
+twilio==7.14.1
+fhirclient==4.1.0
+torch==1.13.0
+transformers==4.24.0
+scipy==1.7.3
+numpy==1.21.5
+pandas==1.3.5
