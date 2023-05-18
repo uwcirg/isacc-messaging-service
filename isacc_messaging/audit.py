@@ -31,7 +31,8 @@ def audit_entry(message, level='info', extra=None):
 
     if extra is None:
         extra = {}
-    # confirm extra can be dumped as JSON
+
+    # confirm extra can be formatted as JSON (otherwise silently disappears)
     try:
         json.dumps(extra)
     except TypeError:

@@ -7,12 +7,8 @@ from flask import current_app
 
 import isacc_messaging
 
-def debug(s):
-    with open("/tmp/fromserver", "a", encoding="utf-8") as f:
-        f.write(s + "\n")
 
 def send_message_received_notification(recipients: list, patient_message, patient_name):
-    debug("in send_message")
     port = current_app.config.get('EMAIL_PORT')  # For SSL
     email_server = current_app.config.get('EMAIL_SERVER')
     email = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_ADDRESS')
@@ -34,29 +30,17 @@ def send_message_received_notification(recipients: list, patient_message, patien
         </html>
         """
 
-    suppress_send = current_app.config.get('MAIL_SUPPRESS_SEND')
-    isacc_messaging.audit.audit_entry(
-        f"Email notification SUPPRESSED",
-        extra={
-            'subject': subject,
-            'email_message': text,
-            'recipients': recipients
-        },
-        level='debug'
+    send_email(
+        recipient_emails=recipients,
+        sender_email=email,
+        sender_name=sender_name,
+        app_password=app_password,
+        subject=subject,
+        text=text,
+        html=html,
+        port=port,
+        email_server=email_server
     )
-    debug("done with send_message")
-    if not suppress_send:
-        send_email(
-            recipient_emails=recipients,
-            sender_email=email,
-            sender_name=sender_name,
-            app_password=app_password,
-            subject=subject,
-            text=text,
-            html=html,
-            port=port,
-            email_server=email_server
-        )
 
 
 def send_email(recipient_emails: list, sender_email, sender_name, app_password, subject, text, html, port,
@@ -75,6 +59,9 @@ def send_email(recipient_emails: list, sender_email, sender_name, app_password, 
     # Create a secure SSL context
     context = ssl.create_default_context()
 
+    if current_app.config.get('MAIL_SUPPRESS_SEND'):
+        return
+
     try:
         with smtplib.SMTP_SSL(email_server, port, context=context) as server:
             server.login(sender_email, app_password)
@@ -92,5 +79,5 @@ def send_email(recipient_emails: list, sender_email, sender_name, app_password, 
             f"Email notification could not be sent",
             extra={
                 'exception': str(e)},
-            level='info'
+            level='error'
         )

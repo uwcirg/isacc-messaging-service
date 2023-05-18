@@ -16,9 +16,6 @@ from isacc_messaging.api.email_notifications import send_message_received_notifi
 from isacc_messaging.api.fhir import HAPI_request
 from isacc_messaging.api.ml_utils import predict_score
 
-def debug(s):
-    with open("/tmp/fromserver", "a", encoding="utf-8") as f:
-        f.write(s + "\n")
 
 class IsaccFhirException(Exception):
     """Raised when a FHIR resource or attribute required for ISACC to operate correctly is missing"""
@@ -33,7 +30,6 @@ class IsaccTwilioError(Exception):
 def first_in_bundle(bundle):
     if bundle['resourceType'] == 'Bundle' and bundle['total'] > 0:
         return bundle['entry'][0]['resource']
-    return None
 
 
 class IsaccRecordCreator:
@@ -71,7 +67,6 @@ class IsaccRecordCreator:
     def convert_communicationrequest_to_communication(self, cr_id=None, cr=None):
         if cr is None and cr_id is not None:
             cr = HAPI_request('GET', 'CommunicationRequest', cr_id)
-            isacc_messaging.audit.audit_entry(f"convert cr_id {cr_id}", level='debug')
         if cr is None:
             raise IsaccFhirException("No CommunicationRequest")
 
@@ -79,7 +74,7 @@ class IsaccRecordCreator:
         if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
             twilio_messages = [i.value for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
             isacc_messaging.audit.audit_entry(
-                f"CommunicationRequest already has Twilio SID -> {cr.id} {twilio_messages} <-",
+                f"CommunicationRequest already has Twilio SID ",
                 extra={
                     'CommunicationRequest': cr.id,
                     "Twilio messages": twilio_messages
@@ -88,7 +83,6 @@ class IsaccRecordCreator:
             )
             return None
 
-        isacc_messaging.audit.audit_entry(f"attempt send cr_id {cr_id}", level='debug')
         target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
         result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
 
@@ -111,7 +105,7 @@ class IsaccRecordCreator:
             isacc_messaging.audit.audit_entry(
                 f"Updated CommunicationRequest with Twilio SID:",
                 extra={"resource": updated_cr},
-                level='info'
+                level='debug'
             )
 
             return updated_cr
@@ -137,38 +131,30 @@ class IsaccRecordCreator:
         isacc_messaging.audit.audit_entry(
             f"Twilio message created via API",
             extra={"twilio_message": message},
-            level='info'
+            level='debug'
         )
         return message
 
-    def get_patient(self, patient_id) -> Patient:
-        result = HAPI_request('GET', 'Patient', patient_id)
-        if result is not None:
-            return Patient(result)
-        else:
-            return None
-
     def get_careplan(self, patient_id) -> CarePlan:
-        result = HAPI_request('GET', 'CarePlan', params={"subject": f"Patient/{patient_id}",
-                                                         "category": "isacc-message-plan",
-                                                         "status": "active",
-                                                         "_sort": "-_lastUpdated"})
+        result = HAPI_request(
+            'GET', 'CarePlan',
+            params={
+                "subject": f"Patient/{patient_id}",
+                "category": "isacc-message-plan",
+                "status": "active",
+                "_sort": "-_lastUpdated"})
+
         result = first_in_bundle(result)
         if result is not None:
             return CarePlan(result)
-        else:
-            return None
 
     def get_patient(self, patient_id):
         result = HAPI_request('GET', 'Patient', resource_id=patient_id)
         if result is not None:
             return Patient(result)
-        else:
-            return None
 
     def get_general_practitioner_emails(self, pt: Patient) -> list:
         emails = []
-        debug("get emails")
         if pt and pt.generalPractitioner:
             for gp_ref in pt.generalPractitioner:
                 # format of gp_ref.reference: "Practitioner/2"
@@ -185,9 +171,8 @@ class IsaccRecordCreator:
             isacc_messaging.audit.audit_entry(
                 "no practioner email to notify",
                 extra={"Patient": str(pt)},
-                level='debug'
+                level='warn'
             )
-        debug(f"got {' '.join(emails)}") 
         return emails
 
     def get_caring_contacts_phone_number(self, patient_id):
@@ -249,39 +234,12 @@ class IsaccRecordCreator:
         isacc_messaging.audit.audit_entry(
             f"Created Communication resource for incoming text",
             extra={"resource": result},
-            level='info'
+            level='debug'
         )
         patient = self.get_patient(patient_id)
         notify_emails = self.get_general_practitioner_emails(patient)
-        debug("generated notify emails")
-        isacc_messaging.audit.audit_entry(
-            f"Generated notify emails",
-            extra={"number emails": len(notify_emails),
-                   "patient_name": patient.name},
-            level='debug'
-        )
         patient_name = " ".join([f"{' '.join(n.given)} {n.family}" for n in patient.name])
-        isacc_messaging.audit.audit_entry(
-            f"notify_emails {notify_emails}",
-            extra={"patient_name": patient_name},
-            level='info'
-        )
-        isacc_messaging.audit.audit_entry(
-            f"attempt send received notification",
-            extra={"patient_name": patient_name,
-                   "mesg": message,
-                   "notify_emails": notify_emails},
-            level='info'
-        )
         send_message_received_notification(notify_emails, message, patient_name)
-        isacc_messaging.audit.audit_entry(
-            f"survived send received notification",
-            extra={"patient_name": patient_name,
-                   "mesg": message,
-                   "notify_emails": notify_emails},
-            level='info'
-        )
-
         self.update_followup_extension(patient_id, message_time)
 
     def on_twilio_message_status_update(self, values):
@@ -324,7 +282,7 @@ class IsaccRecordCreator:
                 isacc_messaging.audit.audit_entry(
                     f"Created Communication resource:",
                     extra={"resource": new_c},
-                    level='info'
+                    level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
                 if self.is_manual_follow_up_message(c):
@@ -335,20 +293,17 @@ class IsaccRecordCreator:
                     extra={"resource": existing_comm,
                            "existing status": existing_comm.status,
                            "message status": message_status},
-                    level='info'
+                    level='debug'
                 )
 
             cr.status = "completed"
-
             cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
 
             isacc_messaging.audit.audit_entry(
                 f"Updated CommunicationRequest due to twilio status update:",
                 extra={"resource": cr},
-                level='info'
+                level='debug'
             )
-
-        return None
 
     def mark_patient_followed_up(self, patient_id):
         self.update_followup_extension(patient_id=patient_id, value_date_time=None)
@@ -370,7 +325,7 @@ class IsaccRecordCreator:
         isacc_messaging.audit.audit_entry(
             f"Updated Patient resource with value for extension",
             extra={"resource": result},
-            level='info'
+            level='debug'
         )
 
     def on_twilio_message_received(self, values):

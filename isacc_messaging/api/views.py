@@ -66,10 +66,9 @@ def auditlog_addevent():
       - ServiceToken: []
 
     """
-    try:
+    body = None
+    if request.data:
         body = request.get_json()
-    except:
-        body = None
 
     if not body:
         return jsonify(message="Missing JSON data"), 400
@@ -97,13 +96,8 @@ def message_status_update():
     record_creator = IsaccRecordCreator()
     result = record_creator.on_twilio_message_status_update(request.values)
     if result is not None:
-        return '', 500
+        return result, 500
     return '', 204
-
-
-def debug(s):
-    with open("/tmp/debug.log", "a", encoding="utf-8") as f:
-        f.write(s + "\n")
 
 
 @base_blueprint.route("/sms", methods=['GET','POST'])
@@ -114,33 +108,25 @@ def incoming_sms():
         level='debug'
     )
     try:
-        debug("on sms received")
         record_creator = IsaccRecordCreator()
         result = record_creator.on_twilio_message_received(request.values)
-        debug("done with sms received")
     except Exception as e:
-        debug(f"caught {e}")
         import traceback, sys
         exc = sys.exc_info()[0]
         stack = traceback.extract_statck()
         trc = "Traceback (most recent call last):\n"
-        debug(f"trc {trc}")
         stackstr = trc + "-->".join(traceback.format_list(stack))
         if exc is not None:
             stackstr += "  " + traceback.format_exc().lstrip(trc)
-        debug(f"stackstr {stackstr}")
         isacc_messaging.audit.audit_entry(
             f"on_twilio_message_received generated: {stackstr}",
             level="error")
-        result = str(e)
         return stackstr, 500
     if result is not None:
-        debug(f"result: {result}")
         isacc_messaging.audit.audit_entry(
             f"on_twilio_message_received generated error {result}",
             level='error')
-        return '', 500
-    debug(f"all happy!")
+        return result, 500
     return '', 204
 
 
@@ -151,7 +137,6 @@ def incoming_sms_handler():
         extra={'request.values': dict(request.values)},
         level='warn'
     )
-
     return '', 204
 
 
@@ -161,7 +146,6 @@ def execute_requests_cli():
 
     if result is not None:
         raise Exception(result)
-    return None
 
 
 @base_blueprint.route("/execute_requests", methods=['POST'])
@@ -189,5 +173,3 @@ def execute_requests():
             level='error'
         )
         return f"Execution failed for CommunicationRequest resources:\n{error_list}"
-
-    return None
