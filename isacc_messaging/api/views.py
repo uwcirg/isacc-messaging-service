@@ -66,7 +66,11 @@ def auditlog_addevent():
       - ServiceToken: []
 
     """
-    body = request.get_json()
+    try:
+        body = request.get_json()
+    except:
+        body = None
+
     if not body:
         return jsonify(message="Missing JSON data"), 400
 
