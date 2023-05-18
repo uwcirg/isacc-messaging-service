@@ -78,6 +78,7 @@ def send_email(recipient_emails: list, sender_email, sender_name, app_password, 
         isacc_messaging.audit.audit_entry(
             f"Email notification could not be sent",
             extra={
+                'recipient_emails': ' '.join(recipient_emails),
                 'exception': str(e)},
             level='error'
         )
