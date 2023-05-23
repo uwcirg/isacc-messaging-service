@@ -113,7 +113,7 @@ def incoming_sms():
     except Exception as e:
         import traceback, sys
         exc = sys.exc_info()[0]
-        stack = traceback.extract_statck()
+        stack = traceback.extract_stack()
         trc = "Traceback (most recent call last):\n"
         stackstr = trc + "-->".join(traceback.format_list(stack))
         if exc is not None:
