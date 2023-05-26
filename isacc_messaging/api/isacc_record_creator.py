@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Tuple
 
 from urllib.parse import parse_qs, urlsplit
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
 from fhirclient.models.communicationrequest import CommunicationRequest
+from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from fhirclient.models.extension import Extension
@@ -291,7 +292,7 @@ class IsaccRecordCreator:
                 isacc_messaging.audit.audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
                     extra={"resource": existing_comm,
-                           "existing status": existing_comm.status,
+                           "existing status": existing_comm.get('status'),
                            "message status": message_status},
                     level='debug'
                 )
@@ -309,21 +310,41 @@ class IsaccRecordCreator:
         self.update_followup_extension(patient_id=patient_id, value_date_time=None)
 
     def update_followup_extension(self, patient_id, value_date_time):
+        """Keep a single extension on the patient at all times
+
+        The value of the extension is:
+        - 50 years in the future for clean sort order, if value passed is None
+        - the oldest value_date_time found in the extension if called with a value
+
+        :param patient_id: the patient to mark with the extension
+        :param value_date_time: time of incoming message from patient, used to track
+          how long it has been since patient reached out.  use None if sending a
+          response to the patient.
+        """
         patient = self.get_patient(patient_id)
-        if value_date_time is None and patient.extension is not None:
-            patient.extension = [i for i in patient.extension if
-                                 i.url != "http://isacc.app/time-of-last-unfollowedup-message"]
+        followup_system = "http://isacc.app/time-of-last-unfollowedup-message"
+        if patient.extension is None:
+            patient.extension = []
+
+        matching_extensions = [i for i in patient.extension if i.url == followup_system]
+        patient.extension = [i for i in patient.extension if i.url != followup_system]
+
+        if value_date_time is None:
+            # Set to 50 years in the future for patient sort by functionality
+            save_value = FHIRDate((datetime.now().astimezone() + timedelta(days=50*365.25)).isoformat())
         else:
-            if patient.extension is None:
-                patient.extension = []
-            patient.extension.append(Extension({
-                "url": "http://isacc.app/time-of-last-unfollowedup-message",
-                "valueDateTime": value_date_time
+            # If older value exists, prefer
+            given_value = FHIRDate(value_date_time)
+            existing = [i.valueDateTime for i in matching_extensions]
+            save_value = min(given_value, *existing, key=lambda x: x.date) if existing else given_value
+        patient.extension.append(Extension({
+                "url": followup_system,
+                "valueDateTime": save_value.isostring
             }))
 
         result = HAPI_request('PUT', 'Patient', resource_id=patient_id, resource=patient.as_json())
         isacc_messaging.audit.audit_entry(
-            f"Updated Patient resource with value for extension",
+            f"Updated Patient resource, last-unfollowedup extension",
             extra={"resource": result},
             level='debug'
         )
