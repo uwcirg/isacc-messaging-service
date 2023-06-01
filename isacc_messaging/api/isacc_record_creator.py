@@ -63,7 +63,7 @@ class IsaccRecordCreator:
                     "code": "SMSWRIT"
                 }]
             }],
-            "note":[n.as_json() for n in cr.note] if cr.note else "",
+            "note":[n.as_json() for n in cr.note] if cr.note else None,
             "status": "completed"
         }
 
