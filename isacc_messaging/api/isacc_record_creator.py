@@ -55,6 +55,7 @@ class IsaccRecordCreator:
 
             "payload": [p.as_json() for p in cr.payload],
             "sent": datetime.now().astimezone().isoformat(),
+            "sender": cr.sender,
             "recipient": [r.as_json() for r in cr.recipient],
             "medium": [{
                 "coding": [{
@@ -62,6 +63,7 @@ class IsaccRecordCreator:
                     "code": "SMSWRIT"
                 }]
             }],
+            "note":[n.as_json() for n in cr.note] if cr.note else None,
             "status": "completed"
         }
 
