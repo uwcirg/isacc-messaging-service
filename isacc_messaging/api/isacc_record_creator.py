@@ -55,7 +55,7 @@ class IsaccRecordCreator:
 
             "payload": [p.as_json() for p in cr.payload],
             "sent": datetime.now().astimezone().isoformat(),
-            "sender": cr.sender,
+            "sender": cr.sender.as_json() if cr.sender else None,
             "recipient": [r.as_json() for r in cr.recipient],
             "medium": [{
                 "coding": [{
