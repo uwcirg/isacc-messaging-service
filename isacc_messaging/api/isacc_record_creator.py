@@ -11,6 +11,7 @@ from fhirclient.models.patient import Patient
 from fhirclient.models.extension import Extension
 from fhirclient.models.practitioner import Practitioner
 from flask import current_app
+from twilio.base.exceptions import TwilioRestException
 
 import isacc_messaging
 from isacc_messaging.api.email_notifications import send_message_received_notification
@@ -85,7 +86,15 @@ class IsaccRecordCreator:
             return None
 
         target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
-        result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
+        try:
+            result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
+        except TwilioRestException as ex:
+            isacc_messaging.audit.audit_entry(
+                "Twilio exception",
+                extra={"resource": result, "exception": ex},
+                level='exception'
+            )
+            raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
 
         if result.status != 'sent' and result.status != 'queued':
             isacc_messaging.audit.audit_entry(
