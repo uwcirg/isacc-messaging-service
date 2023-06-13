@@ -160,24 +160,16 @@ def execute_requests_route():
 def execute_requests():
     successes, errors = IsaccRecordCreator().execute_requests()
 
-    success_list = ""
-    error_list = ""
-
     if len(successes) > 0:
-        success_list = '\n'.join([f"ID: {c['id']}, Status: {c['status']}" for c in successes])
         isacc_messaging.audit.audit_entry(
-            f"Successfully executed CommunicationRequest resources",
-            extra={'successful_resources': success_list},
+            f"Successfully executed CommunicationRequest resources: {', '.join(successes)}",
             level='info'
         )
     if len(errors) > 0:
         error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
         isacc_messaging.audit.audit_entry(
-            "Execution failed for CommunicationRequest resources",
+            "Execution failed for CommunicationRequest resources:",
             extra={'failed_resources': error_list},
             level='error'
         )
-    return "\n".join([
-        f"Execution succeeded for CommunicationRequest resources:\n{success_list}",
-        f"Execution failed for CommunicationRequest resources:\n{error_list}"
-    ])
+        return f"Execution failed for CommunicationRequest resources:\n{error_list}"
