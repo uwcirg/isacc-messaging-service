@@ -30,11 +30,8 @@ class IsaccTwilioError(Exception):
 
 
 def first_in_bundle(bundle):
-    if bundle['resourceType'] == 'Bundle':
-        if bundle['total'] > 0:
-            return bundle['entry'][0]['resource']
-        return None
-    return bundle
+    if bundle['resourceType'] == 'Bundle' and bundle['total'] > 0:
+        return bundle['entry'][0]['resource']
 
 
 class IsaccRecordCreator:
@@ -77,18 +74,16 @@ class IsaccRecordCreator:
 
         cr = CommunicationRequest(cr)
         if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
-            sid = ""
-            status = ""
-            as_of = ""
-            for i in cr.identifier:
-                for e in i.extension:
-                    if e.url == "http://isacc.app/twilio-message-status":
-                        status = e.valueCode
-                    if e.url == "http://isacc.app/twilio-message-status-updated":
-                        as_of = e.valueDateTime.isostring
-                if i.system == "http://isacc.app/twilio-message-sid":
-                    sid = i.value
-            return f"Twilio message (sid: {sid}) was previously dispatched. Last known status: {status} (as of {as_of})"
+            twilio_messages = [i.value for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]
+            isacc_messaging.audit.audit_entry(
+                f"CommunicationRequest already has Twilio SID ",
+                extra={
+                    'CommunicationRequest': cr.id,
+                    "Twilio messages": twilio_messages
+                },
+                level='debug'
+            )
+            return None
 
         target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
         try:
@@ -96,7 +91,7 @@ class IsaccRecordCreator:
         except TwilioRestException as ex:
             isacc_messaging.audit.audit_entry(
                 "Twilio exception",
-                extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
+                extra={"resource": result, "exception": ex},
                 level='exception'
             )
             raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
@@ -114,16 +109,7 @@ class IsaccRecordCreator:
             cr.identifier.append(Identifier({
                 "system": "http://isacc.app/twilio-message-sid",
                 "value": result.sid,
-                "extension": [
-                    {
-                        "url": "http://isacc.app/twilio-message-status",
-                        "valueCode": result.status
-                    },
-                    {
-                        "url": "http://isacc.app/twilio-message-status-updated",
-                        "valueDateTime": datetime.now().astimezone().isoformat()
-                    },
-                ]
+                "extension": [{"url": "http://isacc.app/twilio-message-status", "valueCode": result.status}]
             }))
             updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
             isacc_messaging.audit.audit_entry(
@@ -132,7 +118,7 @@ class IsaccRecordCreator:
                 level='debug'
             )
 
-            return f"Twilio message dispatched (status={result.status})"
+            return updated_cr
 
     def send_twilio_sms(self, message, to_phone, from_phone=None):
         from twilio.rest import Client
@@ -291,8 +277,6 @@ class IsaccRecordCreator:
                 for e in i.extension:
                     if e.url == "http://isacc.app/twilio-message-status":
                         e.valueCode = message_status
-                    if e.url == "http://isacc.app/twilio-message-status-updated":
-                        e.valueDateTime = FHIRDate(datetime.now().astimezone().isoformat())
 
         # sometimes we go straight to delivered. other times we go to sent and then delivered. sometimes we go to sent
         # and never delivered (it has been delivered but we don't get a callback with that status)
@@ -418,7 +402,7 @@ class IsaccRecordCreator:
             )
         return "routine"
 
-    def execute_requests(self) -> Tuple[List[dict], List[dict]]:
+    def execute_requests(self) -> Tuple[List[str], List[dict]]:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
@@ -450,8 +434,8 @@ class IsaccRecordCreator:
             for entry in result['entry']:
                 cr = entry['resource']
                 try:
-                    status = self.convert_communicationrequest_to_communication(cr=cr)
-                    successes.append({'id': cr['id'], 'status': status})
+                    self.convert_communicationrequest_to_communication(cr=cr)
+                    successes.append(cr['id'])
                 except Exception as e:
                     errors.append({'id': cr['id'], 'error': e})
 
