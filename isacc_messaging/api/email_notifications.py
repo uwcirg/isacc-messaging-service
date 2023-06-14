@@ -8,21 +8,21 @@ from flask import current_app
 import isacc_messaging
 
 
-def send_message_received_notification(recipients: list, patient_message, patient_name):
+def send_message_received_notification(recipients: list, patient_id):
     port = current_app.config.get('EMAIL_PORT')  # For SSL
     email_server = current_app.config.get('EMAIL_SERVER')
     email = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_ADDRESS')
     subject = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SUBJECT', 'New message received')
     app_password = current_app.config.get('ISACC_NOTIFICATION_EMAIL_PASSWORD')
     sender_name = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_NAME')
-    link_url = current_app.config.get("ISACC_APP_URL")
+    query = f"sof_client_id=MESSAGING&patient={patient_id}"
+    link_url = f'{current_app.config.get("ISACC_APP_URL")}/target?{query}'
     text = f"ISACC received a message.\nGo to {link_url} to view it."
     html = f"""\
         <html>
           <head></head>
           <body>
-            <p>ISACC received a message from {patient_name}:<br><br>
-            {patient_message}
+            <p>ISACC received a patient message.
             <br><br>
                Go to <a href="{link_url}">ISACC</a> to view it.
             </p>

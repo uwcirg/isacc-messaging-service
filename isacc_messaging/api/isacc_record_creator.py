@@ -195,7 +195,7 @@ class IsaccRecordCreator:
                             emails.append(t.value)
         if not emails:
             isacc_messaging.audit.audit_entry(
-                "no practioner email to notify",
+                "no practitioner email to notify",
                 extra={"Patient": str(pt)},
                 level='warn'
             )
@@ -264,8 +264,7 @@ class IsaccRecordCreator:
         )
         patient = self.get_patient(patient_id)
         notify_emails = self.get_general_practitioner_emails(patient)
-        patient_name = " ".join([f"{' '.join(n.given)} {n.family}" for n in patient.name])
-        send_message_received_notification(notify_emails, message, patient_name)
+        send_message_received_notification(notify_emails, patient_id)
         self.update_followup_extension(patient_id, message_time)
 
     def on_twilio_message_status_update(self, values):
