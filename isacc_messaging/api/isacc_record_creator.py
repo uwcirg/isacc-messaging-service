@@ -156,24 +156,29 @@ class IsaccRecordCreator:
         if result is not None:
             return Patient(result)
 
-    def get_general_practitioner_emails(self, pt: Patient) -> list:
+    def get_practitioners_emails(self, patient_id) -> list:
         emails = []
-        if pt and pt.generalPractitioner:
-            for gp_ref in pt.generalPractitioner:
-                # format of gp_ref.reference: "Practitioner/2"
-                resource_type, resource_id = gp_ref.reference.split('/')
-                result = HAPI_request('GET', resource_type, resource_id)
-                if result is not None:
-                    if resource_type != 'Practitioner':
-                        raise ValueError(f"expected Practitioner in {gp_ref.reference}")
-                    gp = Practitioner(result)
-                    for t in gp.telecom:
-                        if t.system == 'email':
-                            emails.append(t.value)
+        care_plan = self.get_careplan(patient_id)
+        if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
+            # get the referenced CareTeam resource from the care plan
+            resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
+            care_team = HAPI_request('GET', resource_type, resource_id)
+            if care_team and care_team.participant:
+                # format of participants: [{member: {reference: Practitioner/1}}]
+                for participant in care_team.participant:
+                    # format of member.reference: "Practitioner/2"
+                    resource_type, resource_id = participant.member.reference.split('/')
+                    if resource_type == 'Practitioner':
+                        result = HAPI_request('GET', resource_type, resource_id)
+                        if result is not None:
+                            gp = Practitioner(result)
+                            for t in gp.telecom:
+                                if t.system == 'email':
+                                    emails.append(t.value)
         if not emails:
             isacc_messaging.audit.audit_entry(
                 "no practioner email to notify",
-                extra={"Patient": str(pt)},
+                extra={"Patient": patient_id},
                 level='warn'
             )
         return emails
@@ -240,7 +245,7 @@ class IsaccRecordCreator:
             level='debug'
         )
         patient = self.get_patient(patient_id)
-        notify_emails = self.get_general_practitioner_emails(patient)
+        notify_emails = self.get_practitioners_emails(patient_id)
         patient_name = " ".join([f"{' '.join(n.given)} {n.family}" for n in patient.name])
         send_message_received_notification(notify_emails, message, patient_name)
         self.update_followup_extension(patient_id, message_time)
