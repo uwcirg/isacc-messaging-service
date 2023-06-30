@@ -184,6 +184,8 @@ class IsaccRecordCreator:
         care_plan = self.get_careplan(patient_id)
         if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
             # get the referenced CareTeam resource from the care plan
+            # please see https://www.pivotaltracker.com/story/show/185407795
+            # carePlan.careTeam now includes those that follow the patient
             resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
             care_team = HAPI_request('GET', resource_type, resource_id)
             if care_team and care_team.participant:
