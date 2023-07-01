@@ -202,7 +202,7 @@ class IsaccRecordCreator:
                                     emails.append(t.value)
         if not emails:
             isacc_messaging.audit.audit_entry(
-                "no practioner email to notify",
+                "no practitioner email to notify",
                 extra={"Patient": patient_id},
                 level='warn'
             )
