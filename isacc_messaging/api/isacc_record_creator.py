@@ -183,6 +183,12 @@ class IsaccRecordCreator:
         emails = []
         care_plan = self.get_careplan(patient_id)
         if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
+            if len(care_plan.careTeam) > 1:
+                isacc_messaging.audit.audit_entry(
+                    "patient has more than one care team",
+                    extra={"Patient": patient_id},
+                    level='warn'
+                )
             # get the referenced CareTeam resource from the care plan
             # please see https://www.pivotaltracker.com/story/show/185407795
             # carePlan.careTeam now includes those that follow the patient
@@ -269,8 +275,7 @@ class IsaccRecordCreator:
             extra={"resource": result},
             level='debug'
         )
-        patient = self.get_patient(patient_id)
-        notify_emails = self.get_practitioners_emails(patient)
+        notify_emails = self.get_practitioners_emails(patient_id)
         send_message_received_notification(notify_emails, patient_id)
         self.update_followup_extension(patient_id, message_time)
 
