@@ -194,7 +194,7 @@ class IsaccRecordCreator:
             # carePlan.careTeam now includes those that follow the patient
             resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
             care_team = HAPI_request('GET', resource_type, resource_id)
-            if care_team and care_team.participant:
+            if care_team is not None and care_team.participant is not None:
                 # format of participants: [{member: {reference: Practitioner/1}}]
                 for participant in care_team.participant:
                     # format of member.reference: "Practitioner/2"
