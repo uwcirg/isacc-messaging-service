@@ -194,11 +194,11 @@ class IsaccRecordCreator:
             # carePlan.careTeam now includes those that follow the patient
             resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
             care_team = HAPI_request('GET', resource_type, resource_id)
-            if care_team is not None and care_team.participant is not None:
+            if care_team and care_team.get('participant'):
                 # format of participants: [{member: {reference: Practitioner/1}}]
-                for participant in care_team.participant:
+                for participant in care_team['participant']:
                     # format of member.reference: "Practitioner/2"
-                    resource_type, resource_id = participant.member.reference.split('/')
+                    resource_type, resource_id = participant['member']['reference'].split('/')
                     if resource_type == 'Practitioner':
                         result = HAPI_request('GET', resource_type, resource_id)
                         if result is not None:
@@ -213,7 +213,7 @@ class IsaccRecordCreator:
                 level='warn'
             )
         return emails
-    
+
     def get_general_practitioner_emails(self, pt: Patient) -> list:
         emails = []
         if pt and pt.generalPractitioner:
@@ -417,7 +417,7 @@ class IsaccRecordCreator:
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From').replace("+1", "")
+            'telecom': values.get('From', "+1").replace("+1", "")
         })
         pt = first_in_bundle(pt)
         if not pt:
