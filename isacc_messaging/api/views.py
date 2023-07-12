@@ -142,19 +142,13 @@ def incoming_sms_handler():
 
 @base_blueprint.cli.command("execute_requests")
 def execute_requests_cli():
-    result = execute_requests()
-
-    if result is not None:
-        raise Exception(result)
+    execute_requests()
 
 
 @base_blueprint.route("/execute_requests", methods=['POST'])
 def execute_requests_route():
     result = execute_requests()
-
-    if result is not None:
-        return result, 500
-    return '', 204
+    return str(result), 204
 
 
 def execute_requests():
