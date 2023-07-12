@@ -179,6 +179,41 @@ class IsaccRecordCreator:
         if result is not None:
             return Patient(result)
 
+    def get_care_team_emails(self, patient_id) -> list:
+        emails = []
+        care_plan = self.get_careplan(patient_id)
+        if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
+            if len(care_plan.careTeam) > 1:
+                isacc_messaging.audit.audit_entry(
+                    "patient has more than one care team",
+                    extra={"Patient": patient_id},
+                    level='warn'
+                )
+            # get the referenced CareTeam resource from the care plan
+            # please see https://www.pivotaltracker.com/story/show/185407795
+            # carePlan.careTeam now includes those that follow the patient
+            resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
+            care_team = HAPI_request('GET', resource_type, resource_id)
+            if care_team and care_team.get('participant'):
+                # format of participants: [{member: {reference: Practitioner/1}}]
+                for participant in care_team['participant']:
+                    # format of member.reference: "Practitioner/2"
+                    resource_type, resource_id = participant['member']['reference'].split('/')
+                    if resource_type == 'Practitioner':
+                        result = HAPI_request('GET', resource_type, resource_id)
+                        if result is not None:
+                            gp = Practitioner(result)
+                            for t in gp.telecom:
+                                if t.system == 'email':
+                                    emails.append(t.value)
+        if not emails:
+            isacc_messaging.audit.audit_entry(
+                "no practitioner email to notify",
+                extra={"Patient": patient_id},
+                level='warn'
+            )
+        return emails
+
     def get_general_practitioner_emails(self, pt: Patient) -> list:
         emails = []
         if pt and pt.generalPractitioner:
@@ -262,8 +297,13 @@ class IsaccRecordCreator:
             extra={"resource": result},
             level='debug'
         )
+        # look for participating practitioners in patient's care team
+        care_team_emails = self.get_care_team_emails(patient_id)
         patient = self.get_patient(patient_id)
-        notify_emails = self.get_general_practitioner_emails(patient)
+        # look for practitioners in patient's generalPractitioner field
+        practitioners_emails = self.get_general_practitioner_emails(patient)
+        # unique email list
+        notify_emails = list(set(care_team_emails + practitioners_emails))
         send_message_received_notification(notify_emails, patient_id)
         self.update_followup_extension(patient_id, message_time)
 
@@ -377,7 +417,7 @@ class IsaccRecordCreator:
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From').replace("+1", "")
+            'telecom': values.get('From', "+1").replace("+1", "")
         })
         pt = first_in_bundle(pt)
         if not pt:
