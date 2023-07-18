@@ -29,6 +29,11 @@ class IsaccTwilioError(Exception):
     pass
 
 
+class IsaccNotFoundError(Exception):
+    """Raised when an expected resource lookup failes"""
+    pass
+
+
 def first_in_bundle(bundle):
     if bundle['resourceType'] == 'Bundle':
         if bundle['total'] > 0:
@@ -178,6 +183,7 @@ class IsaccRecordCreator:
         result = HAPI_request('GET', 'Patient', resource_id=patient_id)
         if result is not None:
             return Patient(result)
+        raise IsaccNotFoundError("Patient.id {patient_id} NOT FOUND")
 
     def get_care_team_emails(self, patient_id) -> list:
         emails = []
@@ -304,7 +310,7 @@ class IsaccRecordCreator:
         practitioners_emails = self.get_general_practitioner_emails(patient)
         # unique email list
         notify_emails = list(set(care_team_emails + practitioners_emails))
-        send_message_received_notification(notify_emails, patient_id)
+        send_message_received_notification(notify_emails, patient)
         self.update_followup_extension(patient_id, message_time)
 
     def on_twilio_message_status_update(self, values):
