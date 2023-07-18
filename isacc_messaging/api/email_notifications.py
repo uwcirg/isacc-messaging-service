@@ -30,7 +30,7 @@ def send_message_received_notification(recipients: list, patient: Patient):
         for i in patient.identifier:
             if i.system == "http://isacc.app/user-id":
                 user_id = i.value
-    text = f"ISACC received a message from ISACC recipient({user_id}).\nGo to {link_url} to view it."
+    text = f"ISACC received a message from ISACC recipient ({user_id}).\nGo to {link_url} to view it."
     html = f"""\
         <html>
           <head></head>
