@@ -2,22 +2,35 @@ import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from fhirclient.models.patient import Patient
 
 from flask import current_app
 
 import isacc_messaging
 
 
-def send_message_received_notification(recipients: list, patient_id):
+def send_message_received_notification(recipients: list, patient: Patient):
     port = current_app.config.get('EMAIL_PORT')  # For SSL
     email_server = current_app.config.get('EMAIL_SERVER')
     email = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_ADDRESS')
     subject = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SUBJECT', 'New message received')
     app_password = current_app.config.get('ISACC_NOTIFICATION_EMAIL_PASSWORD')
     sender_name = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_NAME')
-    query = f"sof_client_id=MESSAGING&patient={patient_id}"
+    query = f"sof_client_id=MESSAGING&patient={patient.id}"
     link_url = f'{current_app.config.get("ISACC_APP_URL")}/target?{query}'
-    text = f"ISACC received a message.\nGo to {link_url} to view it."
+    if not patient:
+        isacc_messaging.audit.audit_entry(
+            f"Email notification could not be sent - no patient",
+            extra={'recipient_emails': ' '.join(recipients)},
+            level='error'
+        )
+        return "Need patient"
+    user_id = "no ID assigned"
+    if patient.identifier and len([i for i in patient.identifier if i.system == "http://isacc.app/user-id"]) > 0:
+        for i in patient.identifier:
+            if i.system == "http://isacc.app/user-id":
+                user_id = i.value
+    text = f"ISACC received a message from ISACC recipient({user_id}).\nGo to {link_url} to view it."
     html = f"""\
         <html>
           <head></head>

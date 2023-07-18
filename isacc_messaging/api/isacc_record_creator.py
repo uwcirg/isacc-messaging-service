@@ -304,7 +304,7 @@ class IsaccRecordCreator:
         practitioners_emails = self.get_general_practitioner_emails(patient)
         # unique email list
         notify_emails = list(set(care_team_emails + practitioners_emails))
-        send_message_received_notification(notify_emails, patient_id)
+        send_message_received_notification(notify_emails, patient)
         self.update_followup_extension(patient_id, message_time)
 
     def on_twilio_message_status_update(self, values):
