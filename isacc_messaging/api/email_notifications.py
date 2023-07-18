@@ -18,24 +18,16 @@ def send_message_received_notification(recipients: list, patient: Patient):
     sender_name = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_NAME')
     query = f"sof_client_id=MESSAGING&patient={patient.id}"
     link_url = f'{current_app.config.get("ISACC_APP_URL")}/target?{query}'
-    if not patient:
-        isacc_messaging.audit.audit_entry(
-            f"Email notification could not be sent - no patient",
-            extra={'recipient_emails': ' '.join(recipients)},
-            level='error'
-        )
-        return "Need patient"
-    user_id = "no ID assigned"
-    if patient.identifier and len([i for i in patient.identifier if i.system == "http://isacc.app/user-id"]) > 0:
-        for i in patient.identifier:
-            if i.system == "http://isacc.app/user-id":
-                user_id = i.value
-    text = f"ISACC received a message from ISACC recipient ({user_id}).\nGo to {link_url} to view it."
+    user_ids = patient.identifier and [i for i in patient.identifier if i.system == "http://isacc.app/user-id"] or None
+    user_id = user_ids[0].value if user_ids else "no ID assigned"
+    msg = f"ISACC received a message from ISACC recipient ({user_id})."
+    link = f"Go to {link_url} to view it."
+    text = '\n'.join((msg, link))
     html = f"""\
         <html>
           <head></head>
           <body>
-            <p>ISACC received a patient message.
+            <p>{msg}
             <br><br>
                Go to <a href="{link_url}">ISACC</a> to view it.
             </p>
