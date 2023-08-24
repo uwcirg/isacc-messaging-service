@@ -1,7 +1,32 @@
 from flask import current_app
 import requests
 
+from fhirclient.models.patient import Patient
+from fhirclient.models.practitioner import Practitioner
 from isacc_messaging.audit import audit_entry
+
+
+def resovlve_reference(reference_string):
+    """FHIRClient includes a `resolved()` method, but has yet to implement
+
+    :param reference_string: i.e. "Patient/2"
+    :return: instantiated FHIRClient instance by fetching resource
+    """
+    # expand supported class list as needed
+    supported_classes = (Patient, Practitioner)
+    resource_type, id = reference_string.split('/')
+    klass = None
+    for c in supported_classes:
+        if resource_type == klass.resource_type:
+            klass = c
+            break
+    if klass is None:
+        raise ValueError("resource_type: {resource_type} not in supported")
+
+    result = HAPI_request('GET', resource_type, resource_id=id)
+    if result is not None:
+        return klass(result)
+    raise IsaccNotFoundError("{reference_string} NOT FOUND")
 
 
 def HAPI_request(
