@@ -36,7 +36,7 @@ def expand_template_args(content: str, patient: Patient, practitioner: Practitio
         return resource.name[0].given[0]
 
     c = content.replace("{name}", preferred_name(patient))
-    c = c.replace("{userName}", preferred_name(practitioner, "Caring Contacts Team"))
+    c = c.replace("{username}", preferred_name(practitioner, "Caring Contacts Team"))
     return c
 
 
