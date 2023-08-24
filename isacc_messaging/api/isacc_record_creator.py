@@ -15,7 +15,7 @@ from twilio.base.exceptions import TwilioRestException
 
 import isacc_messaging
 from isacc_messaging.api.email_notifications import send_message_received_notification
-from isacc_messaging.api.fhir import HAPI_request
+from isacc_messaging.api.fhir import HAPI_request, resolve_reference
 from isacc_messaging.api.ml_utils import predict_score
 
 
@@ -97,7 +97,7 @@ class IsaccRecordCreator:
                     sid = i.value
             return f"Twilio message (sid: {sid}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
-        target_phone = self.get_caring_contacts_phone_number(cr.recipient[0].reference.split('/')[1])
+        target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
         try:
             result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
         except TwilioRestException as ex:
@@ -166,11 +166,11 @@ class IsaccRecordCreator:
         )
         return message
 
-    def get_careplan(self, patient_id) -> CarePlan:
+    def get_careplan(self, patient: Patient) -> CarePlan:
         result = HAPI_request(
             'GET', 'CarePlan',
             params={
-                "subject": f"Patient/{patient_id}",
+                "subject": f"Patient/{patient.id}",
                 "category": "isacc-message-plan",
                 "status": "active",
                 "_sort": "-_lastUpdated"})
@@ -179,43 +179,34 @@ class IsaccRecordCreator:
         if result is not None:
             return CarePlan(result)
 
-    def get_patient(self, patient_id):
-        result = HAPI_request('GET', 'Patient', resource_id=patient_id)
-        if result is not None:
-            return Patient(result)
-        raise IsaccNotFoundError("Patient.id {patient_id} NOT FOUND")
-
-    def get_care_team_emails(self, patient_id) -> list:
+    def get_care_team_emails(self, patient: Patient) -> list:
         emails = []
-        care_plan = self.get_careplan(patient_id)
+        care_plan = self.get_careplan(patient)
         if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
             if len(care_plan.careTeam) > 1:
                 isacc_messaging.audit.audit_entry(
                     "patient has more than one care team",
-                    extra={"Patient": patient_id},
+                    extra={"Patient": patient.id},
                     level='warn'
                 )
             # get the referenced CareTeam resource from the care plan
             # please see https://www.pivotaltracker.com/story/show/185407795
             # carePlan.careTeam now includes those that follow the patient
-            resource_type, resource_id = care_plan.careTeam[0].reference.split('/')
-            care_team = HAPI_request('GET', resource_type, resource_id)
+            care_team = resolve_reference(care_plan.careTeam[0].reference)
             if care_team and care_team.get('participant'):
                 # format of participants: [{member: {reference: Practitioner/1}}]
                 for participant in care_team['participant']:
-                    # format of member.reference: "Practitioner/2"
-                    resource_type, resource_id = participant['member']['reference'].split('/')
-                    if resource_type == 'Practitioner':
-                        result = HAPI_request('GET', resource_type, resource_id)
-                        if result is not None:
-                            gp = Practitioner(result)
-                            for t in gp.telecom:
-                                if t.system == 'email':
-                                    emails.append(t.value)
+                    gp = resolve_reference(participant['member']['reference'])
+                    if gp.resource_type != 'Practitioner':
+                        continue
+                    for t in gp.telecom:
+                        if t.system == 'email':
+                            emails.append(t.value)
+
         if not emails:
             isacc_messaging.audit.audit_entry(
                 "no practitioner email to notify",
-                extra={"Patient": patient_id},
+                extra={"Patient": patient.id},
                 level='warn'
             )
         return emails
@@ -224,16 +215,10 @@ class IsaccRecordCreator:
         emails = []
         if pt and pt.generalPractitioner:
             for gp_ref in pt.generalPractitioner:
-                # format of gp_ref.reference: "Practitioner/2"
-                resource_type, resource_id = gp_ref.reference.split('/')
-                result = HAPI_request('GET', resource_type, resource_id)
-                if result is not None:
-                    if resource_type != 'Practitioner':
-                        raise ValueError(f"expected Practitioner in {gp_ref.reference}")
-                    gp = Practitioner(result)
-                    for t in gp.telecom:
-                        if t.system == 'email':
-                            emails.append(t.value)
+                gp = resolve_reference(gp_ref.reference)
+                for t in gp.telecom:
+                    if t.system == 'email':
+                        emails.append(t.value)
         if not emails:
             isacc_messaging.audit.audit_entry(
                 "no practitioner email to notify",
@@ -242,15 +227,14 @@ class IsaccRecordCreator:
             )
         return emails
 
-    def get_caring_contacts_phone_number(self, patient_id):
-        pt = self.get_patient(patient_id)
+    def get_caring_contacts_phone_number(self, pt: Patient) -> str:
         if pt.telecom:
             for t in pt.telecom:
                 if t.system == 'sms':
                     return t.value
         raise IsaccFhirException(f"Error: Patient/{pt.id} doesn't have an sms contact point on file")
 
-    def generate_incoming_message(self, message, time: datetime = None, patient_id=None, priority=None, themes=None,
+    def generate_incoming_message(self, message, time: datetime = None, patient: Patient=None, priority=None, themes=None,
                                   twilio_sid=None):
         if priority and priority not in ("routine", "urgent", "stat"):
             return f"Invalid priority given: {priority}. Only routine, urgent, and stat are allowed."
@@ -258,19 +242,19 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient_id is None:
-            return "Need patient ID"
+        if patient is None:
+            return "Need patient"
 
-        care_plan = self.get_careplan(patient_id)
+        care_plan = self.get_careplan(patient)
 
         if not care_plan:
             error = "No CarePlan for this patient:"
             isacc_messaging.audit.audit_entry(
                 error,
-                extra={"patient ID": patient_id},
+                extra={"patient ID": patient.id},
                 level='error'
             )
-            return f"{error}: Patient/{patient_id}"
+            return f"{error}: Patient/{patient.id}"
 
         if time is None:
             time = datetime.now()
@@ -289,7 +273,7 @@ class IsaccRecordCreator:
             'medium': [{'coding': [{'system': 'http://terminology.hl7.org/ValueSet/v3-ParticipationMode',
                                     'code': 'SMSWRIT'}]}],
             'sent': message_time,
-            'sender': {'reference': f'Patient/{patient_id}'},
+            'sender': {'reference': f'Patient/{patient.id}'},
             'payload': [{'contentString': message}],
             'priority': priority,
             'extension': [
@@ -304,14 +288,13 @@ class IsaccRecordCreator:
             level='debug'
         )
         # look for participating practitioners in patient's care team
-        care_team_emails = self.get_care_team_emails(patient_id)
-        patient = self.get_patient(patient_id)
+        care_team_emails = self.get_care_team_emails(patient)
         # look for practitioners in patient's generalPractitioner field
         practitioners_emails = self.get_general_practitioner_emails(patient)
         # unique email list
         notify_emails = list(set(care_team_emails + practitioners_emails))
         send_message_received_notification(notify_emails, patient)
-        self.update_followup_extension(patient_id, message_time)
+        self.update_followup_extension(patient, message_time)
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
@@ -359,7 +342,7 @@ class IsaccRecordCreator:
                 )
                 # if this was a manual message, mark patient as having been followed up with
                 if self.is_manual_follow_up_message(c):
-                    self.mark_patient_followed_up(patient_id=cr.recipient[0].reference.split('/')[1])
+                    self.mark_patient_followed_up(resolve_reference(cr.recipient.reference))
             else:
                 isacc_messaging.audit.audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
@@ -378,22 +361,21 @@ class IsaccRecordCreator:
                 level='debug'
             )
 
-    def mark_patient_followed_up(self, patient_id):
-        self.update_followup_extension(patient_id=patient_id, value_date_time=None)
+    def mark_patient_followed_up(self, patient: Patient):
+        self.update_followup_extension(patient=patient, value_date_time=None)
 
-    def update_followup_extension(self, patient_id, value_date_time):
+    def update_followup_extension(self, patient, value_date_time):
         """Keep a single extension on the patient at all times
 
         The value of the extension is:
         - 50 years in the future for clean sort order, if value passed is None
         - the oldest value_date_time found in the extension if called with a value
 
-        :param patient_id: the patient to mark with the extension
+        :param patient: the patient to mark with the extension
         :param value_date_time: time of incoming message from patient, used to track
           how long it has been since patient reached out.  use None if sending a
           response to the patient.
         """
-        patient = self.get_patient(patient_id)
         followup_system = "http://isacc.app/time-of-last-unfollowedup-message"
         if patient.extension is None:
             patient.extension = []
@@ -414,7 +396,7 @@ class IsaccRecordCreator:
                 "valueDateTime": save_value.isostring
             }))
 
-        result = HAPI_request('PUT', 'Patient', resource_id=patient_id, resource=patient.as_json())
+        result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
         isacc_messaging.audit.audit_entry(
             f"Updated Patient resource, last-unfollowedup extension",
             extra={"resource": result},
@@ -444,7 +426,7 @@ class IsaccRecordCreator:
             message=message,
             time=datetime.now(),
             twilio_sid=values.get('SmsSid'),
-            patient_id=pt.id,
+            patient=pt,
             priority=message_priority
         )
 
