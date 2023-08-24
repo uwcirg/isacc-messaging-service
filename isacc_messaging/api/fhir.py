@@ -7,6 +7,11 @@ from fhirclient.models.practitioner import Practitioner
 from isacc_messaging.audit import audit_entry
 
 
+class IsaccNotFoundError(Exception):
+    """Raised when an expected resource lookup fails"""
+    pass
+
+
 def resolve_reference(reference_string):
     """FHIRClient includes a `resolved()` method, but has yet to implement
 
