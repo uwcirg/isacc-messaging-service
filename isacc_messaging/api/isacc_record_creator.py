@@ -9,7 +9,6 @@ from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
 from fhirclient.models.extension import Extension
-from fhirclient.models.practitioner import Practitioner
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
@@ -26,11 +25,6 @@ class IsaccFhirException(Exception):
 
 class IsaccTwilioError(Exception):
     """Raised when Twilio SMS are not functioning as required for ISACC"""
-    pass
-
-
-class IsaccNotFoundError(Exception):
-    """Raised when an expected resource lookup failes"""
     pass
 
 
