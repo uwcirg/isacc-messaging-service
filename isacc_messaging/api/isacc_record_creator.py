@@ -8,6 +8,7 @@ from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.patient import Patient
+from fhirclient.models.practitioner import Practitioner
 from fhirclient.models.extension import Extension
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
@@ -16,6 +17,27 @@ import isacc_messaging
 from isacc_messaging.api.email_notifications import send_message_received_notification
 from isacc_messaging.api.fhir import HAPI_request, resolve_reference
 from isacc_messaging.api.ml_utils import predict_score
+
+
+def expand_template_args(content: str, patient: Patient, practitioner: Practitioner) -> str:
+    """Interpolate any template args (i.e. {name}) in content"""
+    def preferred_name(resource, default=None):
+        # prefer given name with use category "usual"
+        if not resource:
+            return default
+
+        for name in resource.name:
+            if name.use == "usual":
+                # UI cleared preferred names lose `given`
+                value = name.given and name.given[0]
+                if value:
+                    return value
+
+        return resource.name[0].given[0]
+
+    c = content.replace("{name}", preferred_name(patient))
+    c = c.replace("{userName}", preferred_name(practitioner, "Caring Contacts Team"))
+    return c
 
 
 class IsaccFhirException(Exception):
@@ -93,7 +115,11 @@ class IsaccRecordCreator:
 
         target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
         try:
-            result = self.send_twilio_sms(message=cr.payload[0].contentString, to_phone=target_phone)
+            expanded_payload = expand_template_args(
+                content=cr.payload[0].contentString,
+                patient=resolve_reference(cr.recipient[0].reference),
+                practitioner=None)
+            result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
         except TwilioRestException as ex:
             isacc_messaging.audit.audit_entry(
                 "Twilio exception",
@@ -110,6 +136,7 @@ class IsaccRecordCreator:
             )
             raise IsaccTwilioError(f"ERROR! Message status is neither sent nor queued. It was {result.status}")
         else:
+            cr.payload[0].contentString = expanded_payload
             if not cr.identifier:
                 cr.identifier = []
             cr.identifier.append(Identifier({
