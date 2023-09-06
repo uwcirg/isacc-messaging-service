@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import re
 from typing import List, Tuple
 
 from urllib.parse import parse_qs, urlsplit
@@ -35,8 +36,12 @@ def expand_template_args(content: str, patient: Patient, practitioner: Practitio
 
         return resource.name[0].given[0]
 
-    c = content.replace("{name}", preferred_name(patient))
-    c = c.replace("{username}", preferred_name(practitioner, "Caring Contacts Team"))
+    def case_insensitive_replace(text, old, new):
+        pattern = re.escape(old)
+        return re.sub(pattern, new, text, flags=re.IGNORECASE)
+
+    c = case_insensitive_replace(content, "{name}", preferred_name(patient))
+    c = case_insensitive_replace(c, "{username}", preferred_name(practitioner, "Caring Contacts Team"))
     return c
 
 
@@ -115,10 +120,12 @@ class IsaccRecordCreator:
 
         target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
         try:
+            patient=resolve_reference(cr.recipient[0].reference)
+            practitioner=self.get_general_practitioner(patient)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
-                patient=resolve_reference(cr.recipient[0].reference),
-                practitioner=None)
+                patient=patient,
+                practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
         except TwilioRestException as ex:
             isacc_messaging.audit.audit_entry(
@@ -231,6 +238,13 @@ class IsaccRecordCreator:
                 level='warn'
             )
         return emails
+
+    def get_general_practitioner(self, pt: Patient) -> Practitioner:
+        """return first general practitioner found on patient"""
+        if pt and pt.generalPractitioner:
+            for gp_ref in pt.generalPractitioner:
+                gp = resolve_reference(gp_ref.reference)
+                return gp
 
     def get_general_practitioner_emails(self, pt: Patient) -> list:
         emails = []
