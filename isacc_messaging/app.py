@@ -38,7 +38,7 @@ def configure_logging(app):
         "isacc messaging service logging initialized",
         extra={'tags': ['testing', 'logging', 'app']})
 
-    if not app.config['LOGSERVER_URL']:
+    if not app.config['LOGSERVER_URL'] and not app.config['LOGSERVER_TOKEN']:
         return
 
     audit_log_init(app)
