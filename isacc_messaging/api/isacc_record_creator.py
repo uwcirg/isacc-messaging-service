@@ -221,10 +221,10 @@ class IsaccRecordCreator:
             # please see https://www.pivotaltracker.com/story/show/185407795
             # carePlan.careTeam now includes those that follow the patient
             care_team = resolve_reference(care_plan.careTeam[0].reference)
-            if care_team and care_team.get('participant'):
+            if care_team and care_team.participant:
                 # format of participants: [{member: {reference: Practitioner/1}}]
-                for participant in care_team['participant']:
-                    gp = resolve_reference(participant['member']['reference'])
+                for participant in care_team.participant:
+                    gp = resolve_reference(participant.member.reference)
                     if gp.resource_type != 'Practitioner':
                         continue
                     for t in gp.telecom:
