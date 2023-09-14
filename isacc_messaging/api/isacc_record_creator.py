@@ -116,7 +116,7 @@ class IsaccRecordCreator:
                         as_of = e.valueDateTime.isostring
                 if i.system == "http://isacc.app/twilio-message-sid":
                     sid = i.value
-            return f"Twilio message (sid: {sid}) was previously dispatched. Last known status: {status} (as of {as_of})"
+            return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
         target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
         try:
