@@ -116,7 +116,7 @@ class IsaccRecordCreator:
                         as_of = e.valueDateTime.isostring
                 if i.system == "http://isacc.app/twilio-message-sid":
                     sid = i.value
-            return f"Twilio message (sid: {sid}) was previously dispatched. Last known status: {status} (as of {as_of})"
+            return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
         target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
         try:
@@ -221,10 +221,10 @@ class IsaccRecordCreator:
             # please see https://www.pivotaltracker.com/story/show/185407795
             # carePlan.careTeam now includes those that follow the patient
             care_team = resolve_reference(care_plan.careTeam[0].reference)
-            if care_team and care_team.get('participant'):
+            if care_team and care_team.participant:
                 # format of participants: [{member: {reference: Practitioner/1}}]
-                for participant in care_team['participant']:
-                    gp = resolve_reference(participant['member']['reference'])
+                for participant in care_team.participant:
+                    gp = resolve_reference(participant.member.reference)
                     if gp.resource_type != 'Practitioner':
                         continue
                     for t in gp.telecom:
