@@ -377,7 +377,7 @@ class IsaccRecordCreator:
                 )
                 # if this was a manual message, mark patient as having been followed up with
                 if self.is_manual_follow_up_message(c):
-                    self.mark_patient_followed_up(resolve_reference(cr.recipient.reference))
+                    self.mark_patient_followed_up(resolve_reference(cr.recipient[0].reference))
             else:
                 isacc_messaging.audit.audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
