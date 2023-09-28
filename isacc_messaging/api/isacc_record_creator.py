@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 import re
 from typing import List, Tuple
 
-from urllib.parse import parse_qs, urlsplit
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
 from fhirclient.models.communicationrequest import CommunicationRequest
@@ -16,7 +15,12 @@ from twilio.base.exceptions import TwilioRestException
 
 import isacc_messaging
 from isacc_messaging.api.email_notifications import send_message_received_notification
-from isacc_messaging.api.fhir import HAPI_request, resolve_reference
+from isacc_messaging.api.fhir import (
+    HAPI_request,
+    first_in_bundle,
+    next_in_bundle,
+    resolve_reference,
+)
 from isacc_messaging.api.ml_utils import predict_score
 
 
@@ -53,14 +57,6 @@ class IsaccFhirException(Exception):
 class IsaccTwilioError(Exception):
     """Raised when Twilio SMS are not functioning as required for ISACC"""
     pass
-
-
-def first_in_bundle(bundle):
-    if bundle['resourceType'] == 'Bundle':
-        if bundle['total'] > 0:
-            return bundle['entry'][0]['resource']
-        return None
-    return bundle
 
 
 class IsaccRecordCreator:
@@ -489,7 +485,6 @@ class IsaccRecordCreator:
         successes = []
         errors = []
 
-        limit = 200
         now = datetime.now()
         cutoff = now - timedelta(days=2)
 
@@ -498,30 +493,19 @@ class IsaccRecordCreator:
             "status": "active",
             "occurrence": f"le{now.astimezone().isoformat()}",
             "occurrence": f"gt{cutoff.astimezone().isoformat()}",
-            "_count": str(limit)
         })
 
-        self.process_bundle(errors, result, successes)
-
-        if result["total"] > limit:
-            while len([link['url'] for link in result["link"] if link['relation'] == 'next']) > 0:
-                next_page_url = [link['url'] for link in result["link"] if link['relation'] == 'next'][0]
-                next_page_url = urlsplit(next_page_url)
-                params = parse_qs(next_page_url.query)
-                result = HAPI_request('GET', '', params=params)
-                self.process_bundle(errors, result, successes)
+        for cr in next_in_bundle(result):
+            self.process_cr(errors, cr, successes)
 
         return successes, errors
 
-    def process_bundle(self, errors, result, successes):
-        if result['resourceType'] == 'Bundle' and result['total'] > 0:
-            for entry in result['entry']:
-                cr = entry['resource']
-                try:
-                    status = self.convert_communicationrequest_to_communication(cr=cr)
-                    successes.append({'id': cr['id'], 'status': status})
-                except Exception as e:
-                    errors.append({'id': cr['id'], 'error': e})
+    def process_cr(self, errors, cr, successes):
+        try:
+            status = self.convert_communicationrequest_to_communication(cr=cr)
+            successes.append({'id': cr['id'], 'status': status})
+        except Exception as e:
+            errors.append({'id': cr['id'], 'error': e})
 
     def is_manual_follow_up_message(self, c: Communication) -> bool:
         for category in c.category:
