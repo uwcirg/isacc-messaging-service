@@ -490,10 +490,14 @@ class IsaccRecordCreator:
         errors = []
 
         limit = 200
+        now = datetime.now()
+        cutoff = now - timedelta(days=2)
+
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
-            "occurrence": f"le{datetime.now().astimezone().isoformat()}",
+            "occurrence": f"le{now.astimezone().isoformat()}",
+            "occurrence": f"gt{cutoff.astimezone().isoformat()}",
             "_count": str(limit)
         })
 
