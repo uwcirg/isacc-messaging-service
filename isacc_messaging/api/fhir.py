@@ -65,7 +65,7 @@ def next_in_bundle(bundle):
             next_page_url = [link['url'] for link in result["link"] if link['relation'] == 'next'][0]
             next_page_url = urlsplit(next_page_url)
             params = parse_qs(next_page_url.query)
-            result = HAPI_request('GET', '', params=params)
+            result = HAPI_request('GET', params=params)
             yield result
 
     # yield each resource from first page
