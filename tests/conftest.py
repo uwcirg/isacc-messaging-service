@@ -1,5 +1,4 @@
 from pytest import fixture
-from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 
 @fixture
 def app():
@@ -15,5 +14,6 @@ def client(app):
 
 @fixture
 def patient():
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     p = Patient()
     return p
