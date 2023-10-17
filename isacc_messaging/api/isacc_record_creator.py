@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
-from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
 from fhirclient.models.practitioner import Practitioner
@@ -20,6 +19,7 @@ from isacc_messaging.api.fhir import (
     resolve_reference,
 )
 from isacc_messaging.api.ml_utils import predict_score
+from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
 from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 
 
