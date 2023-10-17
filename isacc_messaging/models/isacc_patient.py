@@ -1,18 +1,29 @@
 """ISACC Patient Module
 
-Captures specialized methods needed by ISACC for Patients, not to be confused with the `fhirclient.Patient` class.
+Captures common methods needed by ISACC for Patients, by specializing the `fhirclient.Patient` class.
 """
 from datetime import datetime, timedelta
-
 from fhirclient.models.extension import Extension
 from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.patient import Patient
+import logging
+
+from isacc_messaging.api.fhir import HAPI_request
 
 
 class IsaccPatient(Patient):
 
     def __init__(self, jsondict=None, strict=True):
         super(IsaccPatient, self).__init__(jsondict=jsondict, strict=strict)
+
+    @staticmethod
+    def active_patients():
+        """Execute query for active patients"""
+        response = HAPI_request('GET', 'Patient', params={
+            "status": "active",
+        })
+        response.raise_for_status()
+        return response
 
     def get_extension(self, url, attribute):
         """Get current value for extension of given url, or None if not found
@@ -50,26 +61,44 @@ class IsaccPatient(Patient):
         """
         if self.extension is None:
             self.extension = []
-        j = 0
+
         for j, extension in zip(range(0, len(self.extension)), self.extension):
             if extension.url == url:
-                # properties won't allow assignment.  pop the old extension and replace
+                # properties won't allow assignment.  delete the old and replace
                 del self.extension[j]
                 break
         self.extension.append(Extension({"url": url, attribute: value}))
 
-    def mark_next_outgoing(self):
+    def mark_next_outgoing(self, verbosity=0):
         """Patient's get a special identifier for time of next outgoing message
+
+        :param verbosity: set to positive number to increase reporting noise
 
         This method calculates and updates the identifier
         """
-        next_outgoing_time = self._lookup_next_outgoing()
+        from isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
+        next_outgoing_time = CommunicationRequest.next_by_patient(self)
 
         # without any pending outgoing messages, add a bogus value
         # 50 years ago, to keep the patient in the search
         if not next_outgoing_time:
             next_outgoing_time = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
 
+        if verbosity > 0:
+            logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time}")
+
         url = "http://isacc.app/date-time-of-next-outgoing-message"
+        if verbosity > 1:
+            current_value = self.get_extension(url=url, attribute="valueDateTime")
+            logging.info(f"current identifier value {current_value}")
         self.set_extension(url=url, value=next_outgoing_time, attribute="valueDateTime")
 
+    def persist(self):
+        """Persist self state to FHIR store"""
+        response = HAPI_request(
+            method="PUT",
+            resource_type=self.resource_type,
+            resource_id=self.id,
+            resource=self.as_json())
+        response.raise_for_status()
+        return response.json()
