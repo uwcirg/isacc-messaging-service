@@ -23,5 +23,4 @@ class IsaccCommunicationRequest(CommunicationRequest):
             "_sort": "occurrence",
             "_maxresults": 1
         })
-        response.raise_for_status()
         return first_in_bundle(response)

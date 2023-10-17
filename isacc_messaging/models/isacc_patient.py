@@ -22,7 +22,6 @@ class IsaccPatient(Patient):
         response = HAPI_request('GET', 'Patient', params={
             "active": True,
         })
-        response.raise_for_status()
         return response
 
     def get_extension(self, url, attribute):
