@@ -20,7 +20,7 @@ class IsaccPatient(Patient):
     def active_patients():
         """Execute query for active patients"""
         response = HAPI_request('GET', 'Patient', params={
-            "status": "active",
+            "active": True,
         })
         response.raise_for_status()
         return response
