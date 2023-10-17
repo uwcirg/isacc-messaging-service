@@ -18,7 +18,7 @@ class IsaccCommunicationRequest(CommunicationRequest):
         """Lookup next active CommunicationRequest for given patient"""
         response = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
-            "status": "active",
+            "active": True,
             "subject": f"Patient/{patient.id}",
             "_sort": "occurrence",
             "_maxresults": 1
