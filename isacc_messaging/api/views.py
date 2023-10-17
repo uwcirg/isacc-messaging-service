@@ -1,8 +1,8 @@
+import click
 import logging
 
 from flask import Blueprint, jsonify, request
 
-import isacc_messaging
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
 
@@ -87,7 +87,7 @@ def auditlog_addevent():
 
 @base_blueprint.route("/MessageStatus", methods=['POST'])
 def message_status_update():
-    isacc_messaging.audit.audit_entry(
+    audit_entry(
         f"Call to /MessageStatus webhook",
         extra={'request.values': dict(request.values)},
         level='debug'
@@ -102,7 +102,7 @@ def message_status_update():
 
 @base_blueprint.route("/sms", methods=['GET','POST'])
 def incoming_sms():
-    isacc_messaging.audit.audit_entry(
+    audit_entry(
         f"Call to /sms webhook",
         extra={'request.values': dict(request.values)},
         level='debug'
@@ -118,12 +118,12 @@ def incoming_sms():
         stackstr = trc + "-->".join(traceback.format_list(stack))
         if exc is not None:
             stackstr += "  " + traceback.format_exc().lstrip(trc)
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"on_twilio_message_received generated: {stackstr}",
             level="error")
         return stackstr, 500
     if result is not None:
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"on_twilio_message_received generated error {result}",
             level='error')
         return result, 500
@@ -132,7 +132,7 @@ def incoming_sms():
 
 @base_blueprint.route("/sms-handler", methods=['GET','POST'])
 def incoming_sms_handler():
-    isacc_messaging.audit.audit_entry(
+    audit_entry(
         f"Received call to /sms-handler webhook (not desired)",
         extra={'request.values': dict(request.values)},
         level='warn'
@@ -159,14 +159,14 @@ def execute_requests():
 
     if len(successes) > 0:
         success_list = '\n'.join([f"ID: {c['id']}, Status: {c['status']}" for c in successes])
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"Successfully executed CommunicationRequest resources",
             extra={'successful_resources': success_list},
             level='info'
         )
     if len(errors) > 0:
         error_list = '\n'.join([f"ID: {c['id']}, Error: {c['error']}" for c in errors])
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             "Execution failed for CommunicationRequest resources",
             extra={'failed_resources': error_list},
             level='error'
@@ -175,3 +175,16 @@ def execute_requests():
         f"Execution succeeded for CommunicationRequest resources:\n{success_list}",
         f"Execution failed for CommunicationRequest resources:\n{error_list}"
     ])
+
+
+@base_blueprint.cli.command("maintenance-update-next-outgoing")
+@click.option("--simulate", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
+def update_next_outgoing_extension(simulate=True):
+    """Iterate through active patients, update any stale/missing next-outgoing identifiers"""
+    from isacc_messaging.api.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    active_patients = Patient.active_patients()
+    for patient in next_in_bundle(active_patients):
+        patient.mark_next_outgoing(verbosity=3)
+        if not simulate:
+            patient.persist()
