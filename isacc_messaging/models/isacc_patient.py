@@ -18,10 +18,12 @@ class IsaccPatient(Patient):
 
     @staticmethod
     def active_patients():
-        """Execute query for active patients"""
-        response = HAPI_request('GET', 'Patient', params={
-            "active": True,
-        })
+        """Execute query for active patients
+
+        NB, until status is set on all patients, queries for
+        any status/active value will skip those without a value.
+        """
+        response = HAPI_request('GET', 'Patient')
         return response
 
     def get_extension(self, url, attribute):
