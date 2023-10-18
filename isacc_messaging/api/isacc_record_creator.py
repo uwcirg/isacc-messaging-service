@@ -492,10 +492,12 @@ class IsaccRecordCreator:
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
             "occurrence": f"le{now.astimezone().isoformat()}",
-            "occurrence": f"gt{cutoff.astimezone().isoformat()}",
         })
 
         for cr in next_in_bundle(result):
+            if cr.occurrenceDateTime < cutoff:
+                # skip over any messages more than 48 hours old, as per #186175825
+                continue
             self.process_cr(errors, cr, successes)
 
         return successes, errors
