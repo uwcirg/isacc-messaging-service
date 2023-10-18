@@ -78,12 +78,14 @@ class IsaccPatient(Patient):
         This method calculates and updates the identifier
         """
         from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
-        next_outgoing_time = CommunicationRequest.next_by_patient(self)
+        next_outgoing = CommunicationRequest.next_by_patient(self)
 
         # without any pending outgoing messages, add a bogus value
         # 50 years ago, to keep the patient in the search
-        if not next_outgoing_time:
+        if not next_outgoing:
             next_outgoing_time = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
+        else:
+            next_outgoing_time = next_outgoing.occurrenceDateTime
 
         if verbosity > 0:
             logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time.isostring}")

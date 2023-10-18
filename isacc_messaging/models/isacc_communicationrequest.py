@@ -19,8 +19,10 @@ class IsaccCommunicationRequest(CommunicationRequest):
         response = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
-            "subject": f"Patient/{patient.id}",
+            "recipient": f"Patient/{patient.id}",
             "_sort": "occurrence",
             "_maxresults": 1
         })
-        return first_in_bundle(response)
+        first = first_in_bundle(response)
+        if first:
+            return CommunicationRequest(first)
