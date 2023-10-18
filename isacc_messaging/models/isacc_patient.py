@@ -42,10 +42,7 @@ class IsaccPatient(Patient):
 
         for extension in self.extension:
             if extension.url == url:
-                value = getattr(extension, attribute)()
-                if attribute == "valueDateTime":
-                    return FHIRDate(value)
-                return value
+                return getattr(extension, attribute)
 
     def set_extension(self, url, value, attribute):
         """Set value for extension on patient to given value.
@@ -93,7 +90,7 @@ class IsaccPatient(Patient):
         url = "http://isacc.app/date-time-of-next-outgoing-message"
         if verbosity > 1:
             current_value = self.get_extension(url=url, attribute="valueDateTime")
-            logging.info(f"current identifier value {current_value}")
+            logging.info(f"current identifier value {current_value.isostring}")
         self.set_extension(url=url, value=next_outgoing_time.isostring, attribute="valueDateTime")
 
     def persist(self):
@@ -103,5 +100,4 @@ class IsaccPatient(Patient):
             resource_type=self.resource_type,
             resource_id=self.id,
             resource=self.as_json())
-        response.raise_for_status()
-        return response.json()
+        return response
