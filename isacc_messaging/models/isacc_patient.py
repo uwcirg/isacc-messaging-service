@@ -77,7 +77,7 @@ class IsaccPatient(Patient):
 
         This method calculates and updates the identifier
         """
-        from isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
+        from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
         next_outgoing_time = CommunicationRequest.next_by_patient(self)
 
         # without any pending outgoing messages, add a bogus value
@@ -86,13 +86,13 @@ class IsaccPatient(Patient):
             next_outgoing_time = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
 
         if verbosity > 0:
-            logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time}")
+            logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time.isostring}")
 
         url = "http://isacc.app/date-time-of-next-outgoing-message"
         if verbosity > 1:
             current_value = self.get_extension(url=url, attribute="valueDateTime")
             logging.info(f"current identifier value {current_value}")
-        self.set_extension(url=url, value=next_outgoing_time, attribute="valueDateTime")
+        self.set_extension(url=url, value=next_outgoing_time.isostring, attribute="valueDateTime")
 
     def persist(self):
         """Persist self state to FHIR store"""
