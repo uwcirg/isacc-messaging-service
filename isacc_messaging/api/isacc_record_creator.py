@@ -479,13 +479,13 @@ class IsaccRecordCreator:
         successes = []
         errors = []
 
-        now = datetime.now()
+        now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
 
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
             "status": "active",
-            "occurrence": f"le{now.astimezone().isoformat()}",
+            "occurrence": f"le{now.isoformat()}",
         })
 
         for cr_json in next_in_bundle(result):
