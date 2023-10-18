@@ -480,7 +480,7 @@ class IsaccRecordCreator:
         errors = []
 
         now = datetime.now()
-        cutoff = now - timedelta(days=2)
+        cutoff = FHIRDate((now - timedelta(days=2)).isoformat())
 
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
