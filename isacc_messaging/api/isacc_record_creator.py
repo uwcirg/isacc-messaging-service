@@ -480,7 +480,7 @@ class IsaccRecordCreator:
         errors = []
 
         now = datetime.now()
-        cutoff = FHIRDate((now - timedelta(days=2)).isoformat())
+        cutoff = now - timedelta(days=2)
 
         result = HAPI_request('GET', 'CommunicationRequest', params={
             "category": "isacc-scheduled-message,isacc-manually-sent-message",
@@ -490,7 +490,7 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            if cr.occurrenceDateTime < cutoff:
+            if cr.occurrenceDateTime.date < cutoff:
                 # skip over any messages more than 48 hours old, as per #186175825
                 continue
             self.process_cr(errors, cr, successes)
