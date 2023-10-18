@@ -184,7 +184,8 @@ def update_next_outgoing_extension(simulate=True):
     from isacc_messaging.api.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
-    for patient in next_in_bundle(active_patients):
+    for json_patient in next_in_bundle(active_patients):
+        patient = Patient(json_patient)
         patient.mark_next_outgoing(verbosity=3)
         if not simulate:
             patient.persist()
