@@ -3,10 +3,10 @@ import requests
 from urllib.parse import parse_qs, urlsplit
 
 from fhirclient.models.careteam import CareTeam
-from fhirclient.models.patient import Patient
 from fhirclient.models.practitioner import Practitioner
 from isacc_messaging.audit import audit_entry
 
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 
 class IsaccNotFoundError(Exception):
     """Raised when an expected resource lookup fails"""
