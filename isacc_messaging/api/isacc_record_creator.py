@@ -93,13 +93,7 @@ class IsaccRecordCreator:
             "status": "completed"
         }
 
-    def convert_communicationrequest_to_communication(self, cr_id=None, cr=None):
-        if cr is None and cr_id is not None:
-            cr = HAPI_request('GET', 'CommunicationRequest', cr_id)
-        if cr is None:
-            raise IsaccFhirException("No CommunicationRequest")
-
-        cr = CommunicationRequest(cr)
+    def convert_communicationrequest_to_communication(self, cr):
         if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
             sid = ""
             status = ""
@@ -494,7 +488,8 @@ class IsaccRecordCreator:
             "occurrence": f"le{now.astimezone().isoformat()}",
         })
 
-        for cr in next_in_bundle(result):
+        for cr_json in next_in_bundle(result):
+            cr = CommunicationRequest(cr_json)
             if cr.occurrenceDateTime < cutoff:
                 # skip over any messages more than 48 hours old, as per #186175825
                 continue
@@ -505,9 +500,9 @@ class IsaccRecordCreator:
     def process_cr(self, errors, cr, successes):
         try:
             status = self.convert_communicationrequest_to_communication(cr=cr)
-            successes.append({'id': cr['id'], 'status': status})
+            successes.append({'id': cr.id, 'status': status})
         except Exception as e:
-            errors.append({'id': cr['id'], 'error': e})
+            errors.append({'id': cr.id, 'error': e})
 
     def is_manual_follow_up_message(self, c: Communication) -> bool:
         for category in c.category:
