@@ -116,6 +116,10 @@ class IsaccRecordCreator:
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
+            # maintain next outgoing extension after each send
+            patient.mark_next_outgoing()
+            patient.persist()
+
         except TwilioRestException as ex:
             isacc_messaging.audit.audit_entry(
                 "Twilio exception",
