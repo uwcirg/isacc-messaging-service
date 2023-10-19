@@ -90,7 +90,8 @@ class IsaccPatient(Patient):
         url = "http://isacc.app/date-time-of-next-outgoing-message"
         if verbosity > 1:
             current_value = self.get_extension(url=url, attribute="valueDateTime")
-            logging.info(f"current identifier value {current_value.isostring}")
+            cv = current_value.isostring if current_value else None
+            logging.info(f"current identifier value {cv}")
         self.set_extension(url=url, value=next_outgoing_time.isostring, attribute="valueDateTime")
 
     def persist(self):
