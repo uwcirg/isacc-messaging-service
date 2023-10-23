@@ -178,7 +178,7 @@ def execute_requests():
 
 
 @base_blueprint.cli.command("maintenance-update-next-outgoing")
-@click.option("--simulate", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
+@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store", simulate)
 def update_next_outgoing_extension(simulate=True):
     """Iterate through active patients, update any stale/missing next-outgoing identifiers"""
     from isacc_messaging.api.fhir import next_in_bundle
