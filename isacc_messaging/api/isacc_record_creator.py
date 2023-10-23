@@ -116,7 +116,7 @@ class IsaccRecordCreator:
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
-            # maintain next outgoing extension after each send
+            # maintain next outgoing Twilio message extension after each send
             patient.mark_next_outgoing()
             patient.persist()
 
