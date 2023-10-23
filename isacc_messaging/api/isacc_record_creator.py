@@ -4,12 +4,9 @@ from typing import List, Tuple
 
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
-from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
-from fhirclient.models.patient import Patient
 from fhirclient.models.practitioner import Practitioner
-from fhirclient.models.extension import Extension
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
@@ -22,6 +19,8 @@ from isacc_messaging.api.fhir import (
     resolve_reference,
 )
 from isacc_messaging.api.ml_utils import predict_score
+from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 
 
 def expand_template_args(content: str, patient: Patient, practitioner: Practitioner) -> str:
@@ -117,6 +116,10 @@ class IsaccRecordCreator:
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
+            # maintain next outgoing Twilio message extension after each send
+            patient.mark_next_outgoing()
+            patient.persist()
+
         except TwilioRestException as ex:
             isacc_messaging.audit.audit_entry(
                 "Twilio exception",
@@ -402,11 +405,7 @@ class IsaccRecordCreator:
           response to the patient.
         """
         followup_system = "http://isacc.app/time-of-last-unfollowedup-message"
-        if patient.extension is None:
-            patient.extension = []
-
-        matching_extensions = [i for i in patient.extension if i.url == followup_system]
-        patient.extension = [i for i in patient.extension if i.url != followup_system]
+        existing = patient.get_extension(url=followup_system, accessor="valueDateTime")
 
         if value_date_time is None:
             # Set to 50 years in the future for patient sort by functionality
@@ -414,12 +413,9 @@ class IsaccRecordCreator:
         else:
             # If older value exists, prefer
             given_value = FHIRDate(value_date_time)
-            existing = [i.valueDateTime for i in matching_extensions]
-            save_value = min(given_value, *existing, key=lambda x: x.date) if existing else given_value
-        patient.extension.append(Extension({
-                "url": followup_system,
-                "valueDateTime": save_value.isostring
-            }))
+            save_value = min(given_value, existing, key=lambda x: x.date) if existing else given_value
+
+        patient.set_extension(url=followup_system, value=save_value.isostring, attribute="valueDateTime")
 
         result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
         isacc_messaging.audit.audit_entry(
