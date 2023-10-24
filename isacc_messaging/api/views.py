@@ -178,8 +178,8 @@ def execute_requests():
 
 
 @base_blueprint.cli.command("maintenance-update-next-outgoing")
-@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store", simulate)
-def update_next_outgoing_extension(simulate=True):
+@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
+def update_next_outgoing_extension(dry_run=True):
     """Iterate through active patients, update any stale/missing next-outgoing identifiers"""
     from isacc_messaging.api.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
@@ -187,5 +187,5 @@ def update_next_outgoing_extension(simulate=True):
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
         patient.mark_next_outgoing(verbosity=3)
-        if not simulate:
+        if not dry_run:
             patient.persist()
