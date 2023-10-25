@@ -1,5 +1,36 @@
+import copy
 from datetime import datetime, timedelta
 from fhirclient.models.fhirdate import FHIRDate
+import json
+import os
+
+from pytest import fixture
+
+from isacc_messaging.models.email import assemble_unresponded_email
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
+
+
+def load_jsondata(datadir, filename):
+    """keep json files used by this test module in like named directory"""
+    with open(os.path.join(datadir, filename), "r") as jsonfile:
+        data = json.load(jsonfile)
+    return data
+
+
+@fixture
+def patient_69(datadir):
+    return load_jsondata(datadir, "patient_69.json")
+
+
+@fixture
+def patient_218(datadir):
+    return load_jsondata(datadir, "patient_218.json")
+
+
+@fixture
+def practitioner_57(datadir):
+    return load_jsondata(datadir, "practitioner_57.json")
 
 
 def test_patient_datetime_extension(patient):
@@ -48,3 +79,26 @@ def test_patient_multiple_extensions(patient):
     second = [i for i in patient.extension if i.url == url2]
     assert len(second) == 1
     assert second[0].valueString == val2
+
+
+def test_prac_email(practitioner_57):
+    prac = Practitioner(practitioner_57)
+    assert prac.email_address == "mcjustin+isaccuserrmcr@uw.edu"
+
+
+def test_unresponded_email_content(patient_69, patient_218, practitioner_57, app_context):
+    p69 = Patient(patient_69)
+    p218 = Patient(patient_218)
+    practitioner = Practitioner(practitioner_57)
+
+    # mock a third Patient for whom this practitioner is not the general
+    p_other = copy.deepcopy(patient_218)
+    p_other["generalPractitioner"][0]["reference"] = "Practitioner/10"
+    p3 = Patient(p_other)
+
+    parts = assemble_unresponded_email(practitioner, patients=[p3, p69, p218])
+    assert "subject" in parts
+    assert "body" in parts
+    assert "link_url" in parts
+    assert "There are 2 unanswered reply/ies for those who you are the primary author" in parts["body"]
+    assert "There are 1 unanswered reply/ies for those whom you are following" in parts["body"]

@@ -8,7 +8,11 @@ from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.patient import Patient
 import logging
 
-from isacc_messaging.api.fhir import HAPI_request
+from isacc_messaging.models.fhir import HAPI_request
+
+# URLs for patient extensions
+LAST_UNFOLLOWEDUP_URL = "http://isacc.app/time-of-last-unfollowedup-message"
+NEXT_OUTGOING_URL = "http://isacc.app/date-time-of-next-outgoing-message"
 
 
 class IsaccPatient(Patient):
@@ -87,12 +91,11 @@ class IsaccPatient(Patient):
         if verbosity > 0:
             logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time.isostring}")
 
-        url = "http://isacc.app/date-time-of-next-outgoing-message"
         if verbosity > 1:
             current_value = self.get_extension(url=url, attribute="valueDateTime")
             cv = current_value.isostring if current_value else None
             logging.info(f"current identifier value {cv}")
-        self.set_extension(url=url, value=next_outgoing_time.isostring, attribute="valueDateTime")
+        self.set_extension(url=NEXT_OUTGOING_URL, value=next_outgoing_time.isostring, attribute="valueDateTime")
 
     def persist(self):
         """Persist self state to FHIR store"""

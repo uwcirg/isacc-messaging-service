@@ -177,6 +177,18 @@ def execute_requests():
     ])
 
 
+@base_blueprint.cli.command("send-system-emails")
+@click.argument("category", required=True)
+@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; generate but don't send email")
+def send_system_emails(category, dry_run):
+    from isacc_messaging.api.email_notifications import generate_unresponded_emails
+    if category == 'unresponded':
+        generate_unresponded_emails(dry_run)
+    else:
+        click.echo(f"unsupported category: {category}")
+
+
+
 @base_blueprint.cli.command("maintenance-update-next-outgoing")
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_next_outgoing_extension(dry_run=True):

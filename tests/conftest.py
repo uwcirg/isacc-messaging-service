@@ -7,6 +7,12 @@ def app():
 
 
 @fixture
+def app_context(app):
+    with app.app_context():
+        yield
+
+
+@fixture
 def client(app):
     with app.test_client() as c:
         yield c

@@ -6,21 +6,21 @@ from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
 from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
-from fhirclient.models.practitioner import Practitioner
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
-import isacc_messaging
 from isacc_messaging.api.email_notifications import send_message_received_notification
-from isacc_messaging.api.fhir import (
+from isacc_messaging.api.ml_utils import predict_score
+from isacc_messaging.audit import audit_entry
+from isacc_messaging.models.fhir import (
     HAPI_request,
     first_in_bundle,
     next_in_bundle,
     resolve_reference,
 )
-from isacc_messaging.api.ml_utils import predict_score
 from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
-from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient, LAST_UNFOLLOWEDUP_URL
+from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
 
 
 def expand_template_args(content: str, patient: Patient, practitioner: Practitioner) -> str:
@@ -121,7 +121,7 @@ class IsaccRecordCreator:
             patient.persist()
 
         except TwilioRestException as ex:
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
                 level='exception'
@@ -129,7 +129,7 @@ class IsaccRecordCreator:
             raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
 
         if result.status != 'sent' and result.status != 'queued':
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 f"Twilio error",
                 extra={"resource": result},
                 level='error'
@@ -154,7 +154,7 @@ class IsaccRecordCreator:
                 ]
             }))
             updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 f"Updated CommunicationRequest with Twilio SID:",
                 extra={"resource": updated_cr},
                 level='debug'
@@ -180,7 +180,7 @@ class IsaccRecordCreator:
             status_callback=webhook_callback + '/MessageStatus'
             # ,media_url=['https://demo.twilio.com/owl.png']
         )
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"Twilio message created via API",
             extra={"twilio_message": message},
             level='debug'
@@ -205,7 +205,7 @@ class IsaccRecordCreator:
         care_plan = self.get_careplan(patient)
         if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
             if len(care_plan.careTeam) > 1:
-                isacc_messaging.audit.audit_entry(
+                audit_entry(
                     "patient has more than one care team",
                     extra={"Patient": patient.id},
                     level='warn'
@@ -225,7 +225,7 @@ class IsaccRecordCreator:
                             emails.append(t.value)
 
         if not emails:
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 "no practitioner email to notify",
                 extra={"Patient": patient.id},
                 level='warn'
@@ -248,7 +248,7 @@ class IsaccRecordCreator:
                     if t.system == 'email':
                         emails.append(t.value)
         if not emails:
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 "no practitioner email to notify",
                 extra={"Patient": str(pt)},
                 level='warn'
@@ -277,7 +277,7 @@ class IsaccRecordCreator:
 
         if not care_plan:
             error = "No CarePlan for this patient:"
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 error,
                 extra={"patient ID": patient.id},
                 level='error'
@@ -310,7 +310,7 @@ class IsaccRecordCreator:
         }
         c = Communication(m)
         result = HAPI_request('POST', 'Communication', resource=c.as_json())
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"Created Communication resource for incoming text",
             extra={"resource": result},
             level='debug'
@@ -334,7 +334,7 @@ class IsaccRecordCreator:
         cr = first_in_bundle(cr)
         if cr is None:
             error = "No CommunicationRequest for this Twilio SID"
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 error,
                 extra={"message_sid": message_sid},
                 level='error'
@@ -363,7 +363,7 @@ class IsaccRecordCreator:
                 c = Communication(c)
 
                 new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
-                isacc_messaging.audit.audit_entry(
+                audit_entry(
                     f"Created Communication resource:",
                     extra={"resource": new_c},
                     level='debug'
@@ -372,7 +372,7 @@ class IsaccRecordCreator:
                 if self.is_manual_follow_up_message(c):
                     self.mark_patient_followed_up(resolve_reference(cr.recipient[0].reference))
             else:
-                isacc_messaging.audit.audit_entry(
+                audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
                     extra={"resource": existing_comm,
                            "existing status": existing_comm.get('status'),
@@ -383,7 +383,7 @@ class IsaccRecordCreator:
             cr.status = "completed"
             cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
 
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 f"Updated CommunicationRequest due to twilio status update:",
                 extra={"resource": cr},
                 level='debug'
@@ -404,8 +404,7 @@ class IsaccRecordCreator:
           how long it has been since patient reached out.  use None if sending a
           response to the patient.
         """
-        followup_system = "http://isacc.app/time-of-last-unfollowedup-message"
-        existing = patient.get_extension(url=followup_system, accessor="valueDateTime")
+        existing = patient.get_extension(url=LAST_UNFOLLOWEDUP_URL, accessor="valueDateTime")
 
         if value_date_time is None:
             # Set to 50 years in the future for patient sort by functionality
@@ -415,10 +414,10 @@ class IsaccRecordCreator:
             given_value = FHIRDate(value_date_time)
             save_value = min(given_value, existing, key=lambda x: x.date) if existing else given_value
 
-        patient.set_extension(url=followup_system, value=save_value.isostring, attribute="valueDateTime")
+        patient.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
 
         result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
-        isacc_messaging.audit.audit_entry(
+        audit_entry(
             f"Updated Patient resource, last-unfollowedup extension",
             extra={"resource": result},
             level='debug'
@@ -432,7 +431,7 @@ class IsaccRecordCreator:
         if not pt:
             error = "No patient with this phone number"
             phone = values.get('From')
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 error,
                 extra={"from_phone": phone},
                 level='error'
@@ -461,7 +460,7 @@ class IsaccRecordCreator:
             if score == 1:
                 return "stat"
         except Exception as e:
-            isacc_messaging.audit.audit_entry(
+            audit_entry(
                 "Failed to assess message urgency",
                 extra={"exception": e},
                 level='error'
