@@ -193,7 +193,7 @@ def send_system_emails(category, dry_run):
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_next_outgoing_extension(dry_run=True):
     """Iterate through active patients, update any stale/missing next-outgoing identifiers"""
-    from isacc_messaging.api.fhir import next_in_bundle
+    from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
