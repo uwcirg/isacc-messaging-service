@@ -404,7 +404,7 @@ class IsaccRecordCreator:
           how long it has been since patient reached out.  use None if sending a
           response to the patient.
         """
-        existing = patient.get_extension(url=LAST_UNFOLLOWEDUP_URL, accessor="valueDateTime")
+        existing = patient.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
 
         if value_date_time is None:
             # Set to 50 years in the future for patient sort by functionality

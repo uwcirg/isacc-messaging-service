@@ -74,6 +74,8 @@ def assemble_unresponded_email(practitioner, patients):
         contents.append(f"The oldest one is {oldest_secondary} day/s old.")
     msg = " ".join(contents)
     contents.append(f"Click here {patient_list_url} to get to the list of these outstanding messages from these people.")
+    contents.append("If you are not the person who should be getting these messages, contact your site lead.")
+    msg += " If you are not the person who should be getting these messages, contact your site lead."
     html = html_template.format(
         msg=msg,
         link_url=patient_list_url,
@@ -94,7 +96,7 @@ def generate_unresponded_emails(dry_run):
     for every practitioner in the system, detailing the number of patients for which
     they have un-responded texts and how long it has been, etc.
     """
-    cutoff = FHIRDate((datetime.now().astimezone() - timedelta(days=1)).isoformat())
+    cutoff = datetime.now().astimezone() - timedelta(days=1)
     known_keepers = []
     known_skippers = []
 
@@ -109,7 +111,7 @@ def generate_unresponded_emails(dry_run):
                 continue
 
             last_unresponded = p.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-            if last_unresponded and last_unresponded < cutoff:
+            if last_unresponded and last_unresponded.date < cutoff:
                 keepers.append(p)
                 known_keepers.append(p)
             else:
