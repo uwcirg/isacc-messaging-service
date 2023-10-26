@@ -1,4 +1,4 @@
-"""Model for email content generation and helpers"""
+"""Module for email utility functions"""
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from flask import current_app
