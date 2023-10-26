@@ -5,7 +5,7 @@ the `fhirclient.CommunicationRequest` class.
 """
 from fhirclient.models.communicationrequest import CommunicationRequest
 
-from isacc_messaging.api.fhir import HAPI_request, first_in_bundle
+from isacc_messaging.models.fhir import HAPI_request, first_in_bundle
 
 
 class IsaccCommunicationRequest(CommunicationRequest):
