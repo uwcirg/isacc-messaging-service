@@ -6,7 +6,7 @@ import os
 
 from pytest import fixture
 
-from isacc_messaging.models.email import assemble_unresponded_email
+from isacc_messaging.api.email_notifications import assemble_unresponded_email
 from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
 
@@ -98,7 +98,7 @@ def test_unresponded_email_content(patient_69, patient_218, practitioner_57, app
 
     parts = assemble_unresponded_email(practitioner, patients=[p3, p69, p218])
     assert "subject" in parts
-    assert "body" in parts
-    assert "link_url" in parts
-    assert "There are 2 unanswered reply/ies for those who you are the primary author" in parts["body"]
-    assert "There are 1 unanswered reply/ies for those whom you are following" in parts["body"]
+    assert "html" in parts
+    assert "text" in parts
+    assert "There are 2 unanswered reply/ies for those who you are the primary author" in parts["text"]
+    assert "There are 1 unanswered reply/ies for those whom you are following" in parts["html"]
