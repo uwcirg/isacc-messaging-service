@@ -5,7 +5,12 @@ Captures common methods needed by ISACC for Practitioners, by specializing the `
 from fhirclient.models.careteam import CareTeam
 from fhirclient.models.practitioner import Practitioner
 
-from isacc_messaging.models.fhir import HAPI_request, next_in_bundle, resolve_reference
+from isacc_messaging.models.fhir import (
+    HAPI_request,
+    IsaccFhirException,
+    next_in_bundle,
+    resolve_reference,
+)
 
 
 class IsaccPractitioner(Practitioner):
@@ -29,6 +34,13 @@ class IsaccPractitioner(Practitioner):
         for t in self.telecom:
             if t.system == "email":
                 return t.value
+
+    def get_phone_number(self) -> str:
+        if self.telecom:
+            for t in self.telecom:
+                if t.system == 'sms':
+                    return t.value
+        raise IsaccFhirException(f"Error: {self} doesn't have an sms contact point on file")
 
     def practitioner_patients(self):
         """Return bundle of patients for which this practitioner is a primary or secondary

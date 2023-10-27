@@ -18,8 +18,9 @@ from isacc_messaging.models.fhir import (
     next_in_bundle,
     resolve_reference,
 )
+from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
 from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
-from isacc_messaging.models.isacc_patient import IsaccPatient as Patient, LAST_UNFOLLOWEDUP_URL
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
 
 
@@ -46,11 +47,6 @@ def expand_template_args(content: str, patient: Patient, practitioner: Practitio
     c = case_insensitive_replace(content, "{name}", preferred_name(patient))
     c = case_insensitive_replace(c, "{username}", preferred_name(practitioner, "Caring Contacts Team"))
     return c
-
-
-class IsaccFhirException(Exception):
-    """Raised when a FHIR resource or attribute required for ISACC to operate correctly is missing"""
-    pass
 
 
 class IsaccTwilioError(Exception):
@@ -107,17 +103,18 @@ class IsaccRecordCreator:
                     sid = i.value
             return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
-        target_phone = self.get_caring_contacts_phone_number(resolve_reference(cr.recipient[0].reference))
+        target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         try:
-            patient=resolve_reference(cr.recipient[0].reference)
-            practitioner=self.get_general_practitioner(patient)
+            patient = resolve_reference(cr.recipient[0].reference)
+            practitioner = resolve_reference(patient.generalPractitioner[0].reference)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
-            # maintain next outgoing Twilio message extension after each send
+            # maintain next outgoing and last followed up Twilio message extensions after each send
             patient.mark_next_outgoing()
+            patient.mark_followup_extension()
             patient.persist()
 
         except TwilioRestException as ex:
@@ -201,7 +198,7 @@ class IsaccRecordCreator:
             return CarePlan(result)
 
     def get_care_team_emails(self, patient: Patient) -> list:
-        emails = []
+        emails = set()  # make sure to return unique values
         care_plan = self.get_careplan(patient)
         if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
             if len(care_plan.careTeam) > 1:
@@ -222,7 +219,7 @@ class IsaccRecordCreator:
                         continue
                     for t in gp.telecom:
                         if t.system == 'email':
-                            emails.append(t.value)
+                            emails.add(t.value)
 
         if not emails:
             audit_entry(
@@ -230,37 +227,7 @@ class IsaccRecordCreator:
                 extra={"Patient": patient.id},
                 level='warn'
             )
-        return emails
-
-    def get_general_practitioner(self, pt: Patient) -> Practitioner:
-        """return first general practitioner found on patient"""
-        if pt and pt.generalPractitioner:
-            for gp_ref in pt.generalPractitioner:
-                gp = resolve_reference(gp_ref.reference)
-                return gp
-
-    def get_general_practitioner_emails(self, pt: Patient) -> list:
-        emails = []
-        if pt and pt.generalPractitioner:
-            for gp_ref in pt.generalPractitioner:
-                gp = resolve_reference(gp_ref.reference)
-                for t in gp.telecom:
-                    if t.system == 'email':
-                        emails.append(t.value)
-        if not emails:
-            audit_entry(
-                "no practitioner email to notify",
-                extra={"Patient": str(pt)},
-                level='warn'
-            )
-        return emails
-
-    def get_caring_contacts_phone_number(self, pt: Patient) -> str:
-        if pt.telecom:
-            for t in pt.telecom:
-                if t.system == 'sms':
-                    return t.value
-        raise IsaccFhirException(f"Error: Patient/{pt.id} doesn't have an sms contact point on file")
+        return list(emails)
 
     def generate_incoming_message(self, message, time: datetime = None, patient: Patient=None, priority=None, themes=None,
                                   twilio_sid=None):
@@ -316,11 +283,8 @@ class IsaccRecordCreator:
             level='debug'
         )
         # look for participating practitioners in patient's care team
-        care_team_emails = self.get_care_team_emails(patient)
-        # look for practitioners in patient's generalPractitioner field
-        practitioners_emails = self.get_general_practitioner_emails(patient)
-        # unique email list
-        notify_emails = list(set(care_team_emails + practitioners_emails))
+        # which always includes the generalPractitioners
+        notify_emails = self.get_care_team_emails(patient)
         send_message_received_notification(notify_emails, patient)
         self.update_followup_extension(patient, message_time)
 
@@ -369,8 +333,8 @@ class IsaccRecordCreator:
                     level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
-                if self.is_manual_follow_up_message(c):
-                    self.mark_patient_followed_up(resolve_reference(cr.recipient[0].reference))
+                if c.is_manual_follow_up_message():
+                    resolve_reference(cr.recipient[0].reference).mark_followup_extension()
             else:
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
@@ -388,40 +352,6 @@ class IsaccRecordCreator:
                 extra={"resource": cr},
                 level='debug'
             )
-
-    def mark_patient_followed_up(self, patient: Patient):
-        self.update_followup_extension(patient=patient, value_date_time=None)
-
-    def update_followup_extension(self, patient, value_date_time):
-        """Keep a single extension on the patient at all times
-
-        The value of the extension is:
-        - 50 years in the future for clean sort order, if value passed is None
-        - the oldest value_date_time found in the extension if called with a value
-
-        :param patient: the patient to mark with the extension
-        :param value_date_time: time of incoming message from patient, used to track
-          how long it has been since patient reached out.  use None if sending a
-          response to the patient.
-        """
-        existing = patient.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-
-        if value_date_time is None:
-            # Set to 50 years in the future for patient sort by functionality
-            save_value = FHIRDate((datetime.now().astimezone() + timedelta(days=50*365.25)).isoformat())
-        else:
-            # If older value exists, prefer
-            given_value = FHIRDate(value_date_time)
-            save_value = min(given_value, existing, key=lambda x: x.date) if existing else given_value
-
-        patient.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
-
-        result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
-        audit_entry(
-            f"Updated Patient resource, last-unfollowedup extension",
-            extra={"resource": result},
-            level='debug'
-        )
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
@@ -498,11 +428,3 @@ class IsaccRecordCreator:
             successes.append({'id': cr.id, 'status': status})
         except Exception as e:
             errors.append({'id': cr.id, 'error': e})
-
-    def is_manual_follow_up_message(self, c: Communication) -> bool:
-        for category in c.category:
-            for coding in category.coding:
-                if coding.system == 'https://isacc.app/CodeSystem/communication-type':
-                    if coding.code == 'isacc-manually-sent-message':
-                        return True
-        return False

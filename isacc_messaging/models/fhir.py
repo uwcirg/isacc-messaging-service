@@ -5,6 +5,11 @@ from urllib.parse import parse_qs, urlsplit
 from isacc_messaging.audit import audit_entry
 
 
+class IsaccFhirException(Exception):
+    """Raised when a FHIR resource or attribute required for ISACC to operate correctly is missing"""
+    pass
+
+
 class IsaccNotFoundError(Exception):
     """Raised when an expected resource lookup fails"""
     pass

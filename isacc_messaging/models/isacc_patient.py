@@ -8,7 +8,9 @@ from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.patient import Patient
 import logging
 
-from isacc_messaging.models.fhir import HAPI_request
+from isacc_messaging.audit import audit_entry
+from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
+from isacc_messaging.models.fhir import HAPI_request, IsaccFhirException, next_in_bundle
 
 # URLs for patient extensions
 LAST_UNFOLLOWEDUP_URL = "http://isacc.app/time-of-last-unfollowedup-message"
@@ -29,6 +31,13 @@ class IsaccPatient(Patient):
         """
         response = HAPI_request('GET', 'Patient')
         return response
+
+    def get_phone_number(self) -> str:
+        if self.telecom:
+            for t in self.telecom:
+                if t.system == 'sms':
+                    return t.value
+        raise IsaccFhirException(f"Error: {self} doesn't have an sms contact point on file")
 
     def get_extension(self, url, attribute):
         """Get current value for extension of given url, or None if not found
@@ -64,19 +73,28 @@ class IsaccPatient(Patient):
         if self.extension is None:
             self.extension = []
 
-        for j, extension in zip(range(0, len(self.extension)), self.extension):
-            if extension.url == url:
-                # properties won't allow assignment.  delete the old and replace
-                del self.extension[j]
-                break
+        keepers = []
+        for extension in self.extension:
+            # properties won't allow assignment.  delete the old and replace
+            if extension.url != url:
+                keepers.append(extension)
+        if len(keepers) != len(self.extension):
+            self.extension = keepers
+
         self.extension.append(Extension({"url": url, attribute: value}))
 
     def mark_next_outgoing(self, verbosity=0):
-        """Patient's get a special identifier for time of next outgoing message
+        """Patient's get a special extension for time of next outgoing message
+
+        All Patients maintain a single extension with url "http://isacc.app/date-time-of-next-outgoing-message"
+        to track the time of the next message scheduled to be sent to the patient, cleared only once no
+        scheduled messages exist for the patient.
+
+        An extension is used to track as it is necessary when used as the sort-by column on patients.
 
         :param verbosity: set to positive number to increase reporting noise
 
-        This method calculates and updates the identifier
+        This idempotent method calculates and updates the appropriate extension
         """
         from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
         next_outgoing = CommunicationRequest.next_by_patient(self)
@@ -91,11 +109,60 @@ class IsaccPatient(Patient):
         if verbosity > 0:
             logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time.isostring}")
 
+        current_value = self.get_extension(url=NEXT_OUTGOING_URL, attribute="valueDateTime")
+        cv = current_value.isostring if current_value else None
         if verbosity > 1:
-            current_value = self.get_extension(url=url, attribute="valueDateTime")
-            cv = current_value.isostring if current_value else None
-            logging.info(f"current identifier value {cv}")
-        self.set_extension(url=NEXT_OUTGOING_URL, value=next_outgoing_time.isostring, attribute="valueDateTime")
+            logging.info(f"current next_outgoing value {cv}")
+        if cv and cv != next_outgoing_time.isostring:
+            logging.debug(f"updating user {self.id} next outgoing to {next_outgoing_time.isostring}")
+            self.set_extension(url=NEXT_OUTGOING_URL, value=next_outgoing_time.isostring, attribute="valueDateTime")
+
+    def mark_followup_extension(self, verbosity=0):
+        """Maintain extension value on the patient at all times to track time since message received
+
+        All Patients maintain a single extension with url "http://isacc.app/time-of-last-unfollowedup-message"
+        to track the time since the earliest message was received from the patient, cleared only once
+        a message is manually sent to the user, indicating a direct response.
+
+        An extension is used to track as it is necessary when used as the sort-by column on patients.
+
+        The value of the extension is:
+        - 50 years in the future (for clean sort order), if user has not sent a message since the most recent followup
+        - the oldest value_date_time of any messages from the user since the last manually-sent message to the user
+
+        :param verbosity: set to positive number to increase reporting noise
+
+        This idempotent method calculates and updates the appropriate extension
+        """
+        most_recent_followup = None
+        for c in next_in_bundle(Communication.for_patient(self, category="isacc-manually-sent-message")):
+            most_recent_followup = FHIRDate(c.sent)
+            break
+
+        oldest_reply = None
+        for c in next_in_bundle(Communication.from_patient(self)):
+            potential = FHIRDate(c.sent)
+            # if the message predates the latest followup, we're done looking
+            if most_recent_followup and most_recent_followup.date > potential:
+                break
+            oldest_reply = potential
+
+        save_value = oldest_reply
+        if not oldest_reply:
+            # Set to 50 years in the future for patient sort by functionality
+            save_value = FHIRDate((datetime.now().astimezone() + timedelta(days=50*365.25)).isoformat())
+
+        existing = self.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
+        if existing.date != save_value.date:
+            self.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
+            result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
+            audit_entry(
+                f"Updated Patient resource, last-unfollowedup extension",
+                extra={"resource": result},
+                level='debug'
+            )
+        elif verbosity > 0:
+            logging.info(f"current value for {self}:{LAST_UNFOLLOWEDUP_URL} found to be accurate")
 
     def persist(self):
         """Persist self state to FHIR store"""
