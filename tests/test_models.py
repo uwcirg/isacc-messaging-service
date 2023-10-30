@@ -1,12 +1,12 @@
 import copy
 from datetime import datetime, timedelta
-from fhirclient.models.fhirdate import FHIRDate
 import json
 import os
 
 from pytest import fixture
 
 from isacc_messaging.api.email_notifications import assemble_unresponded_email
+from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
 from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
 
@@ -102,3 +102,17 @@ def test_unresponded_email_content(patient_69, patient_218, practitioner_57, app
     assert "text" in parts
     assert "There are 2 unanswered reply/ies for those who you are the primary author" in parts["text"]
     assert "There are 1 unanswered reply/ies for those whom you are following" in parts["html"]
+
+
+def test_FHIRDate_compare():
+    n = datetime.now().astimezone()
+    dt1 = FHIRDate(n.isoformat())
+    dt2 = FHIRDate(n.isoformat())
+
+    assert dt1 == dt2
+
+
+def test_FHIRDate_str():
+    n = datetime.now().astimezone().replace(microsecond=0)
+    dt1 = FHIRDate(n.isoformat())
+    assert str(dt1) == n.isoformat()
