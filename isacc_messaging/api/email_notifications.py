@@ -2,7 +2,6 @@ import logging
 from datetime import datetime, timedelta
 
 import click
-from fhirclient.models.fhirdate import FHIRDate
 
 from flask import current_app
 
