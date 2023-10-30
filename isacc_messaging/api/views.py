@@ -198,7 +198,7 @@ def update_next_patient_extensions(dry_run=True):
     active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
-        patient.mark_next_outgoing(verbosity=3)
-        patient.mark_followup_extension(verbosity=3)
+        patient.mark_next_outgoing(persist_on_change=False)
+        patient.mark_followup_extension(persist_on_change=False)
         if not dry_run:
             patient.persist()

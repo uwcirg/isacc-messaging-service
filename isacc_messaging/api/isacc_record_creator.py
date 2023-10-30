@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
-from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.identifier import Identifier
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
@@ -20,6 +19,7 @@ from isacc_messaging.models.fhir import (
 )
 from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
 from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
+from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
 from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
 from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
 

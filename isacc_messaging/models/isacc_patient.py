@@ -4,12 +4,12 @@ Captures common methods needed by ISACC for Patients, by specializing the `fhirc
 """
 from datetime import datetime, timedelta
 from fhirclient.models.extension import Extension
-from fhirclient.models.fhirdate import FHIRDate
 from fhirclient.models.patient import Patient
 import logging
 
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
+from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
 from isacc_messaging.models.fhir import HAPI_request, IsaccFhirException, next_in_bundle
 
 # URLs for patient extensions
@@ -83,7 +83,7 @@ class IsaccPatient(Patient):
 
         self.extension.append(Extension({"url": url, attribute: value}))
 
-    def mark_next_outgoing(self, verbosity=0):
+    def mark_next_outgoing(self, persist_on_change=True):
         """Patient's get a special extension for time of next outgoing message
 
         All Patients maintain a single extension with url "http://isacc.app/date-time-of-next-outgoing-message"
@@ -92,7 +92,7 @@ class IsaccPatient(Patient):
 
         An extension is used to track as it is necessary when used as the sort-by column on patients.
 
-        :param verbosity: set to positive number to increase reporting noise
+        :param persist_on_change: set false to skip persisting any patient changes to db
 
         This idempotent method calculates and updates the appropriate extension
         """
@@ -102,22 +102,23 @@ class IsaccPatient(Patient):
         # without any pending outgoing messages, add a bogus value
         # 50 years ago, to keep the patient in the search
         if not next_outgoing:
-            next_outgoing_time = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
+            save_value = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
         else:
-            next_outgoing_time = next_outgoing.occurrenceDateTime
+            save_value = next_outgoing.occurrenceDateTime
 
-        if verbosity > 0:
-            logging.info(f"Patient {self.id} next outgoing: {next_outgoing_time.isostring}")
+        existing = self.get_extension(url=NEXT_OUTGOING_URL, attribute="valueDateTime")
+        logging.debug(f"Patient {self.id} extension {NEXT_OUTGOING_URL}: {save_value} (was {existing}")
+        if save_value != existing:
+            self.set_extension(url=NEXT_OUTGOING_URL, value=save_value.isostring, attribute="valueDateTime")
+            if persist_on_change:
+                result = self.persist()
+                audit_entry(
+                    f"Updated Patient resource, next-outgoing extension",
+                    extra={"resource": result},
+                    level='debug'
+                )
 
-        current_value = self.get_extension(url=NEXT_OUTGOING_URL, attribute="valueDateTime")
-        cv = current_value.isostring if current_value else None
-        if verbosity > 1:
-            logging.info(f"current next_outgoing value {cv}")
-        if cv and cv != next_outgoing_time.isostring:
-            logging.debug(f"updating user {self.id} next outgoing to {next_outgoing_time.isostring}")
-            self.set_extension(url=NEXT_OUTGOING_URL, value=next_outgoing_time.isostring, attribute="valueDateTime")
-
-    def mark_followup_extension(self, verbosity=0):
+    def mark_followup_extension(self, persist_on_change=True):
         """Maintain extension value on the patient at all times to track time since message received
 
         All Patients maintain a single extension with url "http://isacc.app/time-of-last-unfollowedup-message"
@@ -130,7 +131,7 @@ class IsaccPatient(Patient):
         - 50 years in the future (for clean sort order), if user has not sent a message since the most recent followup
         - the oldest value_date_time of any messages from the user since the last manually-sent message to the user
 
-        :param verbosity: set to positive number to increase reporting noise
+        :param persist_on_change: set false to skip persisting patient change to db
 
         This idempotent method calculates and updates the appropriate extension
         """
@@ -153,16 +154,16 @@ class IsaccPatient(Patient):
             save_value = FHIRDate((datetime.now().astimezone() + timedelta(days=50*365.25)).isoformat())
 
         existing = self.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-        if existing.date != save_value.date:
+        logging.debug(f"Patient {self.id} extenstion {LAST_UNFOLLOWEDUP_URL}: {save_value} (was {existing}")
+        if save_value != existing:
             self.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
-            result = HAPI_request('PUT', 'Patient', resource_id=patient.id, resource=patient.as_json())
-            audit_entry(
-                f"Updated Patient resource, last-unfollowedup extension",
-                extra={"resource": result},
-                level='debug'
-            )
-        elif verbosity > 0:
-            logging.info(f"current value for {self}:{LAST_UNFOLLOWEDUP_URL} found to be accurate")
+            if persist_on_change:
+                result = self.persist()
+                audit_entry(
+                    f"Updated Patient resource, last-unfollowed-up extension",
+                    extra={"resource": result},
+                    level='debug'
+                )
 
     def persist(self):
         """Persist self state to FHIR store"""
