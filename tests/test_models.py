@@ -44,12 +44,16 @@ def test_patient_datetime_extension(patient):
 
 def test_patient_add_extension(patient):
     url = "http://example.com/no-dups"
-    value = datetime.now().isoformat()
+    value = datetime.now().astimezone()
 
-    patient.set_extension(url=url, value=value, attribute="valueDateTime")
+    patient.set_extension(url=url, value=value.isoformat(), attribute="valueDateTime")
     assert len(patient.extension) == 1
     assert patient.extension[0].url == url
-    assert patient.extension[0].valueDateTime.origval == value
+    assert patient.extension[0].valueDateTime.origval == value.isoformat()
+
+    # confirm specialized class (with working ==) cast works
+    extension = patient.get_extension(url=url, attribute="valueDateTime")
+    assert extension == value
 
     # confirm second add with same url replaces first value
     tomorrow = (datetime.now() + timedelta(days=1)).isoformat()
@@ -110,6 +114,17 @@ def test_FHIRDate_compare():
     dt2 = FHIRDate(n.isoformat())
 
     assert dt1 == dt2
+
+
+def test_FHIRDate_compare_to_dt():
+    n = datetime.now().astimezone()
+    dt1 = FHIRDate(n.isoformat())
+    assert dt1 == n
+
+    # confirm microseconds aren't considered
+    n_no_micro = n.replace(microsecond=0)
+    assert n != n_no_micro
+    assert dt1 == n_no_micro
 
 
 def test_FHIRDate_str():

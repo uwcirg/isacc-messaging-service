@@ -9,7 +9,11 @@ import logging
 
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
-from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
+from isacc_messaging.models.isacc_fhirdate import (
+    DEEP_FUTURE,
+    DEEP_PAST,
+    IsaccFHIRDate as FHIRDate,
+)
 from isacc_messaging.models.fhir import HAPI_request, IsaccFhirException, next_in_bundle
 
 # URLs for patient extensions
@@ -50,12 +54,20 @@ class IsaccPatient(Patient):
         for most resources.  This method will return the current value to an extension on the
         Patient resource, with the matching url, or None if not found.
         """
+        from fhirclient.models.fhirdate import FHIRDate as BaseFHIRDate
+        retval = None
         if not self.extension:
             return
 
         for extension in self.extension:
             if extension.url == url:
-                return getattr(extension, attribute)
+                retval = getattr(extension, attribute)
+
+        # FHIRDates are challenging to work with.  Convert to specialized isacc_fhirdate if
+        # types match
+        if isinstance(retval, BaseFHIRDate):
+            retval = FHIRDate(retval.isostring)
+        return retval
 
     def set_extension(self, url, value, attribute):
         """Set value for extension on patient to given value.
@@ -99,12 +111,12 @@ class IsaccPatient(Patient):
         from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest as CommunicationRequest
         next_outgoing = CommunicationRequest.next_by_patient(self)
 
-        # without any pending outgoing messages, add a bogus value
-        # 50 years ago, to keep the patient in the search
+        # without any pending outgoing messages, add a bogus value deep in the past to keep the patient in
+        # the search (searching by extension will eliminate patients without said extension)
         if not next_outgoing:
-            save_value = FHIRDate((datetime.now().astimezone() - timedelta(days=50*365.25)).isoformat())
+            save_value = DEEP_PAST
         else:
-            save_value = next_outgoing.occurrenceDateTime
+            save_value = FHIRDate(next_outgoing.occurrenceDateTime.isostring)
 
         existing = self.get_extension(url=NEXT_OUTGOING_URL, attribute="valueDateTime")
         logging.debug(f"Patient {self.id} extension {NEXT_OUTGOING_URL}: {save_value} (was {existing}")
@@ -113,7 +125,7 @@ class IsaccPatient(Patient):
             if persist_on_change:
                 result = self.persist()
                 audit_entry(
-                    f"Updated Patient resource, next-outgoing extension",
+                    f"Updated Patient({self.id}) next-outgoing extension to {save_value}",
                     extra={"resource": result},
                     level='debug'
                 )
@@ -137,7 +149,7 @@ class IsaccPatient(Patient):
         """
         most_recent_followup = None
         for c in next_in_bundle(Communication.for_patient(self, category="isacc-manually-sent-message")):
-            most_recent_followup = FHIRDate(c.sent)
+            most_recent_followup = FHIRDate(c["sent"])
             break
 
         oldest_reply = None
@@ -150,17 +162,18 @@ class IsaccPatient(Patient):
 
         save_value = oldest_reply
         if not oldest_reply:
-            # Set to 50 years in the future for patient sort by functionality
-            save_value = FHIRDate((datetime.now().astimezone() + timedelta(days=50*365.25)).isoformat())
+            # without any pending outgoing messages, add a bogus value deep in the past to keep the patient
+            # in the search (searching by extension will eliminate patients without said extension)
+            save_value = DEEP_FUTURE
 
         existing = self.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-        logging.debug(f"Patient {self.id} extenstion {LAST_UNFOLLOWEDUP_URL}: {save_value} (was {existing}")
+        logging.debug(f"Patient {self.id} extension {LAST_UNFOLLOWEDUP_URL}: {save_value} (was {existing}")
         if save_value != existing:
             self.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
             if persist_on_change:
                 result = self.persist()
                 audit_entry(
-                    f"Updated Patient resource, last-unfollowed-up extension",
+                    f"Updated Patient({self.id}) last-unfollowed-up extension to {save_value}",
                     extra={"resource": result},
                     level='debug'
                 )
