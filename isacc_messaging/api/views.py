@@ -190,7 +190,7 @@ def send_system_emails(category, dry_run):
 
 @base_blueprint.cli.command("maintenance-update-patient-extensions")
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
-def update_next_patient_extensions(dry_run):
+def update_patient_extensions(dry_run):
     """Iterate through active patients, update any stale/missing extensions"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
