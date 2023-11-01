@@ -119,8 +119,8 @@ class IsaccPatient(Patient):
             save_value = FHIRDate(next_outgoing.occurrenceDateTime.isostring)
 
         existing = self.get_extension(url=NEXT_OUTGOING_URL, attribute="valueDateTime")
-        logging.debug(f"Patient {self.id} extension {NEXT_OUTGOING_URL}: {save_value} (was {existing}")
         if save_value != existing:
+            logging.debug(f"set Patient({self.id}) extension {NEXT_OUTGOING_URL}: {save_value} (was {existing})")
             self.set_extension(url=NEXT_OUTGOING_URL, value=save_value.isostring, attribute="valueDateTime")
             if persist_on_change:
                 result = self.persist()
@@ -154,9 +154,9 @@ class IsaccPatient(Patient):
 
         oldest_reply = None
         for c in next_in_bundle(Communication.from_patient(self)):
-            potential = FHIRDate(c.sent)
+            potential = FHIRDate(c["sent"])
             # if the message predates the latest followup, we're done looking
-            if most_recent_followup and most_recent_followup.date > potential:
+            if most_recent_followup and most_recent_followup > potential:
                 break
             oldest_reply = potential
 
@@ -167,8 +167,8 @@ class IsaccPatient(Patient):
             save_value = DEEP_FUTURE
 
         existing = self.get_extension(url=LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-        logging.debug(f"Patient {self.id} extension {LAST_UNFOLLOWEDUP_URL}: {save_value} (was {existing}")
         if save_value != existing:
+            logging.debug(f"set Patient({self.id}) extension {LAST_UNFOLLOWEDUP_URL}: {save_value} (was {existing})")
             self.set_extension(url=LAST_UNFOLLOWEDUP_URL, value=save_value.isostring, attribute="valueDateTime")
             if persist_on_change:
                 result = self.persist()
