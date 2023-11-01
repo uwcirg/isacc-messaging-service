@@ -2,7 +2,6 @@
 
 Captures common methods needed by ISACC for Patients, by specializing the `fhirclient.Patient` class.
 """
-from datetime import datetime, timedelta
 from fhirclient.models.extension import Extension
 from fhirclient.models.patient import Patient
 import logging
@@ -25,6 +24,9 @@ class IsaccPatient(Patient):
 
     def __init__(self, jsondict=None, strict=True):
         super(IsaccPatient, self).__init__(jsondict=jsondict, strict=strict)
+
+    def __repr__(self):
+        return f"{self.resource_type}/{self.id}"
 
     @staticmethod
     def active_patients():

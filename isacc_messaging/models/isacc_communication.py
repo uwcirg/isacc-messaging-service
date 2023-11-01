@@ -13,6 +13,9 @@ class IsaccCommunication(Communication):
     def __init__(self, jsondict=None, strict=True):
         super(IsaccCommunication, self).__init__(jsondict=jsondict, strict=strict)
 
+    def __repr__(self):
+        return f"{self.resource_type}/{self.id}"
+
     def is_manual_follow_up_message(self) -> bool:
         """returns true IFF the communication category shows manually sent"""
         for category in self.category:
