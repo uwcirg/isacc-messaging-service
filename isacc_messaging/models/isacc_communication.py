@@ -28,7 +28,7 @@ class IsaccCommunication(Communication):
         return HAPI_request('GET', 'Communication', params={
             "category": category,
             "recipient": f"Patient/{patient.id}",
-            "_sort": "sent",
+            "_sort": "-sent",
         })
 
     @staticmethod
@@ -36,5 +36,5 @@ class IsaccCommunication(Communication):
         """Query for all Communications received from patient"""
         return HAPI_request('GET', 'Communication', params={
             "sender": f"Patient/{patient.id}",
-            "_sort": "received",
+            "_sort": "-sent",
         })
