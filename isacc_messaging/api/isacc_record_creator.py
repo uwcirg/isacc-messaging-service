@@ -115,7 +115,6 @@ class IsaccRecordCreator:
             # maintain next outgoing and last followed up Twilio message extensions after each send
             patient.mark_next_outgoing()
             patient.mark_followup_extension()
-            patient.persist()
 
         except TwilioRestException as ex:
             audit_entry(
@@ -286,7 +285,7 @@ class IsaccRecordCreator:
         # which always includes the generalPractitioners
         notify_emails = self.get_care_team_emails(patient)
         send_message_received_notification(notify_emails, patient)
-        self.update_followup_extension(patient, message_time)
+        patient.mark_followup_extension()
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
