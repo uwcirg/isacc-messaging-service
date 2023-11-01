@@ -11,6 +11,9 @@ class IsaccFHIRDate(FHIRDate):
     def __init__(self, jsonval=None):
         super(IsaccFHIRDate, self).__init__(jsonval=jsonval)
 
+    def __gt__(self, other):
+        return self.date > other.date
+
     def __eq__(self, other):
         if not other:
             return False
