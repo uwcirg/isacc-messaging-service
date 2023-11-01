@@ -130,4 +130,5 @@ def test_FHIRDate_compare_to_dt():
 def test_FHIRDate_str():
     n = datetime.now().astimezone().replace(microsecond=0)
     dt1 = FHIRDate(n.isoformat())
-    assert str(dt1) == n.isoformat()
+    # some versions of datetime use tz offset rather than `Z`
+    assert str(dt1) == n.isoformat().replace("+00:00", "Z")
