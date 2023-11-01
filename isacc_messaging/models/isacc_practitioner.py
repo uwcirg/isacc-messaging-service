@@ -18,6 +18,9 @@ class IsaccPractitioner(Practitioner):
     def __init__(self, jsondict=None, strict=True):
         super(IsaccPractitioner, self).__init__(jsondict=jsondict, strict=strict)
 
+    def __repr__(self):
+        return f"{self.resource_type}/{self.id}"
+
     @staticmethod
     def active_practitioners():
         """Execute query for active practitioners
