@@ -51,8 +51,9 @@ def assemble_unresponded_email(practitioner, patients):
     :return: email content
     """
     patient_list_url = f'{current_app.config.get("ISACC_APP_URL")}/home?flags=following'
-    oldest_primary = datetime.now().astimezone()
-    oldest_secondary = oldest_primary
+    now = datetime.now().astimezone()
+    oldest_primary = now
+    oldest_secondary = now
     primary, secondary = [], []
     for p in patients:
         moment = p.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime").date
@@ -63,14 +64,16 @@ def assemble_unresponded_email(practitioner, patients):
         secondary.append(p)
         oldest_secondary = min(oldest_secondary, moment)
 
+    oldest_primary_days = (now - oldest_primary).days
+    oldest_secondary_days = (now - oldest_secondary).days
     subject = f"ISACC {len(patients)} day old message/s are unanswered!"
     contents = []
     if primary:
         contents.append(f"There are {len(primary)} unanswered reply/ies for those who you are the primary author.")
-        contents.append(f"The oldest one is {oldest_primary} day/s old.")
+        contents.append(f"The oldest one is {oldest_primary_days} day/s old.")
     if secondary:
         contents.append(f"There are {len(secondary)} unanswered reply/ies for those whom you are following.")
-        contents.append(f"The oldest one is {oldest_secondary} day/s old.")
+        contents.append(f"The oldest one is {oldest_secondary_days} day/s old.")
     msg = " ".join(contents)
     contents.append(f"Click here {patient_list_url} to get to the list of these outstanding messages from these people.")
     contents.append("If you are not the person who should be getting these messages, contact your site lead.")
