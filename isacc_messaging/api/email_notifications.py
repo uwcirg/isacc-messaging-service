@@ -14,9 +14,11 @@ html_template = """
     <html>
       <head></head>
       <body>
-        <p>{msg}
+        <p>{pre_link_msg}
         <br><br>
            Go to <a href="{link_url}">ISACC</a> {link_suffix_text}.
+        </p>
+        <p>{post_link_msg}
         </p>
       </body>
     </html>
@@ -32,7 +34,11 @@ def send_message_received_notification(recipients: list, patient: Patient):
     msg = f"ISACC received a message from ISACC recipient ({user_id})."
     link = f"Go to {link_url} to view it."
     text = '\n'.join((msg, link))
-    html = html_template.format(msg=msg, link_url=link_url, link_suffix_text="to view it")
+    html = html_template.format(
+        pre_link_msg=msg,
+        link_url=link_url,
+        link_suffix_text="to view it",
+        post_link_msg="")
 
     send_email(
         recipient_emails=recipients,
@@ -77,11 +83,11 @@ def assemble_unresponded_email(practitioner, patients):
     msg = " ".join(contents)
     contents.append(f"Click here {patient_list_url} to get to the list of these outstanding messages from these people.")
     contents.append("If you are not the person who should be getting these messages, contact your site lead.")
-    msg += " If you are not the person who should be getting these messages, contact your site lead."
     html = html_template.format(
-        msg=msg,
+        pre_link_msg=msg,
         link_url=patient_list_url,
-        link_suffix_text="to get to the list of these outstanding messages from these people")
+        link_suffix_text="to get to the list of these outstanding messages from these people",
+        post_link_msg="If you are not the person who should be getting these messages, contact your site lead.")
 
     return {
         "subject": subject,
