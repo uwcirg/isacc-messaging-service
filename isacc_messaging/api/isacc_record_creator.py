@@ -402,6 +402,7 @@ class IsaccRecordCreator:
         """
         successes = []
         errors = []
+        skipped_crs = []
 
         now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
@@ -415,9 +416,23 @@ class IsaccRecordCreator:
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
             if cr.occurrenceDateTime.date < cutoff:
-                # skip over any messages more than 48 hours old, as per #186175825
+                # anything older than cutoff will never be sent (#1861758)
+                # and needs a status adjustment lest it throws off other queries
+                # like next outgoing message time
+                skipped_crs.append(cr)
                 continue
             self.process_cr(errors, cr, successes)
+
+        for cr in skipped_crs:
+            cr.status = "revoked"
+            HAPI_request(
+                "PUT",
+                "CommunicationRequest",
+                resource_id=cr.id,
+                resource=cr.as_json())
+            audit_entry(
+                f"Skipped CommunicationRequest({cr.id}); status set to revoked",
+                extra={"CommunicationRequest": cr.as_json()})
 
         return successes, errors
 
