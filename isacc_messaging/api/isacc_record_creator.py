@@ -106,7 +106,10 @@ class IsaccRecordCreator:
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         try:
             patient = resolve_reference(cr.recipient[0].reference)
-            practitioner = resolve_reference(patient.generalPractitioner[0].reference)
+            if not patient.generalPractitioner:
+                practitioner=None
+            else:
+                practitioner = resolve_reference(patient.generalPractitioner[0].reference)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
                 patient=patient,
@@ -448,3 +451,5 @@ class IsaccRecordCreator:
             successes.append({'id': cr.id, 'status': status})
         except Exception as e:
             errors.append({'id': cr.id, 'error': e})
+            # impossible to track errors - re-raise for stack in stderr
+            raise e
