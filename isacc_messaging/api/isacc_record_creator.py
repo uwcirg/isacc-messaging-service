@@ -112,9 +112,6 @@ class IsaccRecordCreator:
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
-            # maintain next outgoing and last followed up Twilio message extensions after each send
-            patient.mark_next_outgoing()
-            patient.mark_followup_extension()
 
         except TwilioRestException as ex:
             audit_entry(
@@ -351,6 +348,11 @@ class IsaccRecordCreator:
                 extra={"resource": cr},
                 level='debug'
             )
+
+            # maintain next outgoing and last followed up Twilio message
+            # extensions after each send (now know to be complete)
+            patient.mark_next_outgoing()
+            patient.mark_followup_extension()
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
