@@ -305,6 +305,7 @@ class IsaccRecordCreator:
             return f"{error}: {message_sid}"
 
         cr = CommunicationRequest(cr)
+        patient = resolve_reference(cr.recipient[0].reference)
 
         # update the message status in the identifier/extension attributes
         for i in cr.identifier:
@@ -333,7 +334,7 @@ class IsaccRecordCreator:
                 )
                 # if this was a manual message, mark patient as having been followed up with
                 if c.is_manual_follow_up_message():
-                    resolve_reference(cr.recipient[0].reference).mark_followup_extension()
+                    patient.mark_followup_extension()
             else:
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
