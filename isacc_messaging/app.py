@@ -34,11 +34,11 @@ def configure_logging(app):
 
     logging_config.fileConfig(config, disable_existing_loggers=False)
     app.logger.setLevel(getattr(logging, app.config['LOG_LEVEL'].upper()))
-    app.logger.debug(
-        "isacc messaging service logging initialized",
-        extra={'tags': ['testing', 'logging', 'app']})
 
     if not app.config['LOGSERVER_URL'] or not app.config['LOGSERVER_TOKEN']:
+        app.logger.debug(
+            "isacc messaging service logging initialized",
+            extra={'tags': ['testing', 'logging', 'app']})
         return
 
     audit_log_init(app)
