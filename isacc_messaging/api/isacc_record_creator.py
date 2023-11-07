@@ -435,6 +435,10 @@ class IsaccRecordCreator:
             audit_entry(
                 f"Skipped CommunicationRequest({cr.id}); status set to revoked",
                 extra={"CommunicationRequest": cr.as_json()})
+            # as that message was likely the next-outgoing for the patient,
+            # update the extension used to track next-outgoing-message time
+            patient = resolve_reference(cr.recipient[0].reference)
+            patient.mark_next_outgoing()
 
         return successes, errors
 
