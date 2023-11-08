@@ -20,7 +20,7 @@ html_template = """
         </p>
         <p>{post_link_msg}
         </p>
-        <h3><a href="{unsubscribe_link}">unsubscribe</a></h3>
+        <p><a href="{unsubscribe_link}">Click here to unsubscribe.</a></p>
       </body>
     </html>
     """
