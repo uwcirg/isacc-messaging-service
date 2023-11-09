@@ -25,6 +25,20 @@ class IsaccCommunication(Communication):
                         return True
 
     @staticmethod
+    def about_patient(patient):
+        """Query for "outside" Communications about the patient
+
+        NB: only `sent` or `received` will have a valueDateTime depending on
+        direction of outside communication.  `sent` implies communication from
+        practitioner, `received` implies communication from patient.
+        """
+        return HAPI_request("GET", "Communication", params={
+            "category": "isacc-non-sms-message",
+            "subject": f"Patient/{patient.id}",
+            "_sort": "-sent",
+        })
+
+    @staticmethod
     def for_patient(patient, category):
         """Query for all Communications intended for patient with matching code"""
         # TODO: limit by status?
