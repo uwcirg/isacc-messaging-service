@@ -19,6 +19,7 @@ def send_email(recipient_emails: list, subject, text, html):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = sender_name
+    msg.add_header("List-Unsubscribe", f"{current_app.config.get('ISACC_APP_URL')}/unsubscribe")
 
     # Record the MIME types of both parts - text/plain and text/html.
     part1 = MIMEText(text, 'plain')

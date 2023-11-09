@@ -20,12 +20,15 @@ html_template = """
         </p>
         <p>{post_link_msg}
         </p>
+        <p><a href="{unsubscribe_link}">Click here to unsubscribe.</a></p>
       </body>
     </html>
     """
 
 
 def send_message_received_notification(recipients: list, patient: Patient):
+    SUPPORT_EMAIL = current_app.config.get('ISACC_SUPPORT_EMAIL')
+    UNSUB_LINK = f'{current_app.config.get("ISACC_APP_URL")}/unsubscribe'
     subject = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SUBJECT', 'New message received')
     query = f"sof_client_id=MESSAGING&patient={patient.id}"
     link_url = f'{current_app.config.get("ISACC_APP_URL")}/target?{query}'
@@ -38,7 +41,10 @@ def send_message_received_notification(recipients: list, patient: Patient):
         pre_link_msg=msg,
         link_url=link_url,
         link_suffix_text="to view it",
-        post_link_msg="")
+        post_link_msg=(
+            f'<h3><a href="mailto:{SUPPORT_EMAIL}">Send Email</a>'
+            'if you have questions.</h3>'),
+        unsubscribe_link=UNSUB_LINK)
 
     send_email(
         recipient_emails=recipients,
@@ -56,6 +62,8 @@ def assemble_unresponded_email(practitioner, patients):
       expected to only include those with an un-responded message
     :return: email content
     """
+    SUPPORT_EMAIL = current_app.config.get('ISACC_SUPPORT_EMAIL')
+    UNSUB_LINK = f'{current_app.config.get("ISACC_APP_URL")}/unsubscribe'
     patient_list_url = f'{current_app.config.get("ISACC_APP_URL")}/home?flags=following'
     now = datetime.now().astimezone()
     oldest_primary = now
@@ -87,7 +95,10 @@ def assemble_unresponded_email(practitioner, patients):
         pre_link_msg=msg,
         link_url=patient_list_url,
         link_suffix_text="to get to the list of these outstanding messages from these people",
-        post_link_msg="If you are not the person who should be getting these messages, contact your site lead.")
+        post_link_msg=(
+            "If you are not the person who should be getting these messages, contact "
+            f'<a href="mailto:{SUPPORT_EMAIL}">your site lead</a>.'),
+        unsubscribe_link=UNSUB_LINK)
 
     return {
         "subject": subject,
