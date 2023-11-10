@@ -5,13 +5,16 @@ the `fhirclient.CommunicationRequest` class.
 """
 from fhirclient.models.communicationrequest import CommunicationRequest
 
-from isacc_messaging.api.fhir import HAPI_request, first_in_bundle
+from isacc_messaging.models.fhir import HAPI_request, first_in_bundle
 
 
 class IsaccCommunicationRequest(CommunicationRequest):
 
     def __init__(self, jsondict=None, strict=True):
         super(IsaccCommunicationRequest, self).__init__(jsondict=jsondict, strict=strict)
+
+    def __repr__(self):
+        return f"{self.resource_type}/{self.id}"
 
     @staticmethod
     def next_by_patient(patient):

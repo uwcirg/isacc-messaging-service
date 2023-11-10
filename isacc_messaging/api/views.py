@@ -177,15 +177,25 @@ def execute_requests():
     ])
 
 
-@base_blueprint.cli.command("maintenance-update-next-outgoing")
+@base_blueprint.cli.command("send-system-emails")
+@click.argument("category", required=True)
+@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; generate but don't send email")
+def send_system_emails(category, dry_run):
+    from isacc_messaging.api.email_notifications import generate_unresponded_emails
+    if category == 'unresponded':
+        generate_unresponded_emails(dry_run)
+    else:
+        click.echo(f"unsupported category: {category}")
+
+
+@base_blueprint.cli.command("maintenance-update-patient-extensions")
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
-def update_next_outgoing_extension(dry_run=True):
-    """Iterate through active patients, update any stale/missing next-outgoing identifiers"""
-    from isacc_messaging.api.fhir import next_in_bundle
+def update_patient_extensions(dry_run):
+    """Iterate through active patients, update any stale/missing extensions"""
+    from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
-        patient.mark_next_outgoing(verbosity=3)
-        if not dry_run:
-            patient.persist()
+        patient.mark_next_outgoing(persist_on_change=not dry_run)
+        patient.mark_followup_extension(persist_on_change=not dry_run)

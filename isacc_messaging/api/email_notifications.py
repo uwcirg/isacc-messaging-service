@@ -1,21 +1,35 @@
-import smtplib
-import ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from fhirclient.models.patient import Patient
+import logging
+from datetime import datetime, timedelta
+
+import click
 
 from flask import current_app
 
-import isacc_messaging
+from isacc_messaging.models.email import send_email
+from isacc_messaging.models.fhir import next_in_bundle
+from isacc_messaging.models.isacc_patient import IsaccPatient as Patient, LAST_UNFOLLOWEDUP_URL
+from isacc_messaging.models.isacc_practitioner import IsaccPractitioner as Practitioner
+
+html_template = """
+    <html>
+      <head></head>
+      <body>
+        <p>{pre_link_msg}
+        <br><br>
+           Go to <a href="{link_url}">ISACC</a> {link_suffix_text}.
+        </p>
+        <p>{post_link_msg}
+        </p>
+        <p><a href="{unsubscribe_link}">Click here to unsubscribe.</a></p>
+      </body>
+    </html>
+    """
 
 
 def send_message_received_notification(recipients: list, patient: Patient):
-    port = current_app.config.get('EMAIL_PORT')  # For SSL
-    email_server = current_app.config.get('EMAIL_SERVER')
-    email = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_ADDRESS')
+    SUPPORT_EMAIL = current_app.config.get('ISACC_SUPPORT_EMAIL')
+    UNSUB_LINK = f'{current_app.config.get("ISACC_APP_URL")}/unsubscribe'
     subject = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SUBJECT', 'New message received')
-    app_password = current_app.config.get('ISACC_NOTIFICATION_EMAIL_PASSWORD')
-    sender_name = current_app.config.get('ISACC_NOTIFICATION_EMAIL_SENDER_NAME')
     query = f"sof_client_id=MESSAGING&patient={patient.id}"
     link_url = f'{current_app.config.get("ISACC_APP_URL")}/target?{query}'
     user_ids = patient.identifier and [i for i in patient.identifier if i.system == "http://isacc.app/user-id"] or None
@@ -23,67 +37,127 @@ def send_message_received_notification(recipients: list, patient: Patient):
     msg = f"ISACC received a message from ISACC recipient ({user_id})."
     link = f"Go to {link_url} to view it."
     text = '\n'.join((msg, link))
-    html = f"""\
-        <html>
-          <head></head>
-          <body>
-            <p>{msg}
-            <br><br>
-               Go to <a href="{link_url}">ISACC</a> to view it.
-            </p>
-          </body>
-        </html>
-        """
+    html = html_template.format(
+        pre_link_msg=msg,
+        link_url=link_url,
+        link_suffix_text="to view it",
+        post_link_msg=(
+            f'<h3><a href="mailto:{SUPPORT_EMAIL}">Send Email</a>'
+            'if you have questions.</h3>'),
+        unsubscribe_link=UNSUB_LINK)
 
     send_email(
         recipient_emails=recipients,
-        sender_email=email,
-        sender_name=sender_name,
-        app_password=app_password,
         subject=subject,
         text=text,
         html=html,
-        port=port,
-        email_server=email_server
     )
 
 
-def send_email(recipient_emails: list, sender_email, sender_name, app_password, subject, text, html, port,
-               email_server):
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = sender_name
+def assemble_unresponded_email(practitioner, patients):
+    """Pull together email content for given practitioner and their list of patients
 
-    # Record the MIME types of both parts - text/plain and text/html.
-    part1 = MIMEText(text, 'plain')
-    msg.attach(part1)
+    :param practitioner: Practitioner object, target of email
+    :param patients: list of Patient objects for whom the practitioner is assigned,
+      expected to only include those with an un-responded message
+    :return: email content
+    """
+    SUPPORT_EMAIL = current_app.config.get('ISACC_SUPPORT_EMAIL')
+    UNSUB_LINK = f'{current_app.config.get("ISACC_APP_URL")}/unsubscribe'
+    patient_list_url = f'{current_app.config.get("ISACC_APP_URL")}/home?flags=following'
+    now = datetime.now().astimezone()
+    oldest_primary = now
+    oldest_secondary = now
+    primary, secondary = [], []
+    for p in patients:
+        moment = p.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime").date
+        if p.generalPractitioner and p.generalPractitioner[0].reference == f"Practitioner/{practitioner.id}":
+            primary.append(p)
+            oldest_primary = min(oldest_primary, moment)
+            continue
+        secondary.append(p)
+        oldest_secondary = min(oldest_secondary, moment)
 
-    part2 = MIMEText(html, 'html')
-    msg.attach(part2)
+    oldest_primary_days = (now - oldest_primary).days
+    oldest_secondary_days = (now - oldest_secondary).days
+    subject = f"ISACC {len(patients)} day old message/s are unanswered!"
+    contents = []
+    if primary:
+        contents.append(f"There are {len(primary)} unanswered reply/ies for those who you are the primary author.")
+        contents.append(f"The oldest one is {oldest_primary_days} day/s old.")
+    if secondary:
+        contents.append(f"There are {len(secondary)} unanswered reply/ies for those whom you are following.")
+        contents.append(f"The oldest one is {oldest_secondary_days} day/s old.")
+    msg = " ".join(contents)
+    contents.append(f"Click here {patient_list_url} to get to the list of these outstanding messages from these people.")
+    contents.append("If you are not the person who should be getting these messages, contact your site lead.")
+    html = html_template.format(
+        pre_link_msg=msg,
+        link_url=patient_list_url,
+        link_suffix_text="to get to the list of these outstanding messages from these people",
+        post_link_msg=(
+            "If you are not the person who should be getting these messages, contact "
+            f'<a href="mailto:{SUPPORT_EMAIL}">your site lead</a>.'),
+        unsubscribe_link=UNSUB_LINK)
 
-    # Create a secure SSL context
-    context = ssl.create_default_context()
+    return {
+        "subject": subject,
+        "text": " ".join(contents),
+        "html": html}
 
-    if current_app.config.get('MAIL_SUPPRESS_SEND'):
-        return
 
-    try:
-        with smtplib.SMTP_SSL(email_server, port, context=context) as server:
-            server.login(sender_email, app_password)
-            server.sendmail(sender_email, recipient_emails, msg.as_string())
-            isacc_messaging.audit.audit_entry(
-                f"Email notification sent",
-                extra={
-                    'email_message': msg.as_string(),
-                    'recipients': recipient_emails
-                },
-                level='info'
+def generate_unresponded_emails(dry_run):
+    """Generate system emails to practitioners with counts
+
+    :param dry_run: set true to generate but not send email
+
+    At a scheduled time every day, this function will be triggered to generate email
+    for every practitioner in the system, detailing the number of patients for which
+    they have un-responded texts and how long it has been, etc.
+    """
+    cutoff = datetime.now().astimezone() - timedelta(days=1)
+    known_keepers = []
+    known_skippers = []
+
+    def unresponded_patients(patients):
+        """helper to return only sublist of patients with qualified un-responded messages"""
+        keepers = []
+        for p in patients:
+            if p in known_keepers:
+                keepers.append(p)
+                continue
+            if p in known_skippers:
+                continue
+
+            last_unresponded = p.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
+            if last_unresponded and last_unresponded.date < cutoff:
+                keepers.append(p)
+                known_keepers.append(p)
+            else:
+                known_skippers.append(p)
+
+        return keepers
+
+    practitioners = Practitioner.active_practitioners()
+    for p in next_in_bundle(practitioners):
+        practitioner = Practitioner(p)
+        practitioners_patients = practitioner.practitioner_patients()
+        unresponded = unresponded_patients(practitioners_patients)
+        if not unresponded:
+            logging.debug(f"no qualifying unresponded patients for {practitioner}")
+            continue
+
+        email_bits = assemble_unresponded_email(practitioner, unresponded)
+        if not dry_run:
+            send_email(
+                recipient_emails=[practitioner.email_address],
+                subject=email_bits["subject"],
+                html=email_bits["html"],
+                text=email_bits["text"])
+        else:
+            click.echo(
+                f"email to: {practitioner.email_address}\n"
+                f"subject: {email_bits['subject']}\n"
+                f"body: {email_bits['text']}\n\n"
+                f"html: {email_bits['html']}\n\n"
             )
-    except Exception as e:
-        isacc_messaging.audit.audit_entry(
-            f"Email notification could not be sent",
-            extra={
-                'recipient_emails': ' '.join(recipient_emails),
-                'exception': str(e)},
-            level='error'
-        )
