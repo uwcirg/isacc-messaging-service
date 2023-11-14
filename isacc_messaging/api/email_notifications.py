@@ -98,6 +98,41 @@ def assemble_outgoing_counts_email(practitioner, patients):
         "html": html}
 
 
+def unique_by_id_add(container, item):
+    """only add item to container if the item.id is not already in container
+
+    NB: mutates container by adding item if not already present
+    """
+    already_present = [i for i in container if i.id == item.id]
+    if already_present:
+        return
+    container.add(item)
+
+
+known_keepers = set()  # set of unique patient ids
+known_skippers = set() # set of unique patient ids
+
+
+def filter_patients(patients, filter_func):
+    """helper to return only sublist of patients using filter function"""
+    keepers = set()
+    for p in patients:
+        id = p.id
+        if id in known_keepers:
+            unique_by_id_add(container=keepers, item=p)
+            continue
+        if id in known_skippers:
+            continue
+
+        if filter_func(p):
+            unique_by_id_add(container=keepers, item=p)
+            known_keepers.add(id)
+        else:
+            known_skippers.add(id)
+
+    return list(keepers)
+
+
 def generate_outgoing_counts_emails(dry_run, include_test_patients):
     """Generate system emails to practitioners with counts
 
@@ -110,33 +145,20 @@ def generate_outgoing_counts_emails(dry_run, include_test_patients):
     """
     now = datetime.now().astimezone()
     cutoff = now + timedelta(days=1)
-    known_keepers = set()
-    known_skippers = set()
+    known_keepers.clear()
+    known_skippers.clear()
 
-    def outgoing_patients(patients):
-        """helper to return only sublist of patients with qualified outgoing messages"""
-        keepers = set()
-        for p in patients:
-            if p in known_keepers:
-                keepers.add(p)
-                continue
-            if p in known_skippers:
-                continue
-
-            next_outgoing = p.get_extension(NEXT_OUTGOING_URL, attribute="valueDateTime")
-            if next_outgoing and next_outgoing.date > now and next_outgoing.date < cutoff:
-                keepers.add(p)
-                known_keepers.add(p)
-            else:
-                known_skippers.add(p)
-
-        return list(keepers)
+    def keep_patient_criteria(patient):
+        """function passed to filter out which patients should be kept for this report"""
+        next_outgoing = patient.get_extension(NEXT_OUTGOING_URL, attribute="valueDateTime")
+        if next_outgoing and next_outgoing.date > now and next_outgoing.date < cutoff:
+            return True
 
     practitioners = Practitioner.active_practitioners()
     for p in next_in_bundle(practitioners):
         practitioner = Practitioner(p)
         practitioners_patients = practitioner.practitioner_patients(include_test_patients=include_test_patients)
-        outgoing = outgoing_patients(practitioners_patients)
+        outgoing = filter_patients(patients=practitioners_patients, filter_func=keep_patient_criteria)
         if not outgoing:
             logging.debug(f"no qualifying outgoing patients for {practitioner}")
             continue
@@ -221,33 +243,20 @@ def generate_unresponded_emails(dry_run, include_test_patients):
     they have un-responded texts and how long it has been, etc.
     """
     cutoff = datetime.now().astimezone() - timedelta(days=1)
-    known_keepers = []
-    known_skippers = []
+    known_keepers.clear()
+    known_skippers.clear()
 
-    def unresponded_patients(patients):
-        """helper to return only sublist of patients with qualified un-responded messages"""
-        keepers = []
-        for p in patients:
-            if p in known_keepers:
-                keepers.append(p)
-                continue
-            if p in known_skippers:
-                continue
-
-            last_unresponded = p.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
-            if last_unresponded and last_unresponded.date < cutoff:
-                keepers.append(p)
-                known_keepers.append(p)
-            else:
-                known_skippers.append(p)
-
-        return keepers
+    def keep_patient_criteria(patient):
+        """function passed to filter out which patients should be kept for this report"""
+        last_unresponded = patient.get_extension(LAST_UNFOLLOWEDUP_URL, attribute="valueDateTime")
+        if last_unresponded and last_unresponded.date < cutoff:
+            return True
 
     practitioners = Practitioner.active_practitioners()
     for p in next_in_bundle(practitioners):
         practitioner = Practitioner(p)
         practitioners_patients = practitioner.practitioner_patients(include_test_patients=include_test_patients)
-        unresponded = unresponded_patients(practitioners_patients)
+        unresponded = filter_patients(patients=practitioners_patients, filter_func=keep_patient_criteria)
         if not unresponded:
             logging.debug(f"no qualifying unresponded patients for {practitioner}")
             continue
