@@ -22,7 +22,7 @@ jobs:
     env:
       SESSION_REDIS: redis://redis:6379/0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v1
 
       - name: Install test runner
         run: python3 -m pip install tox
