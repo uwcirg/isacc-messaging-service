@@ -12,6 +12,8 @@ class IsaccFHIRDate(FHIRDate):
         super(IsaccFHIRDate, self).__init__(jsonval=jsonval)
 
     def __gt__(self, other):
+        if not other:
+            raise TypeError(f"'>' not supported between instances of '{type(self)}' and '{type(other)}'")
         return self.date > other.date
 
     def __eq__(self, other):
