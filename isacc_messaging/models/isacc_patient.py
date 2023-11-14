@@ -157,6 +157,8 @@ class IsaccPatient(Patient):
         for c in next_in_bundle(Communication.about_patient(self)):
             # only consider outside communications reported to have been `sent`
             if "sent" in c:
+                if most_recent_followup is None:
+                    most_recent_followup = FHIRDate(c["sent"])
                 most_recent_followup = max(most_recent_followup, FHIRDate(c["sent"]))
                 break
 
