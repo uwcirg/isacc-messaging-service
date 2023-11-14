@@ -1,10 +1,13 @@
 from flask import current_app
 import requests
+from urllib.parse import parse_qs, urlsplit
 
-from fhirclient.models.careteam import CareTeam
-from fhirclient.models.patient import Patient
-from fhirclient.models.practitioner import Practitioner
 from isacc_messaging.audit import audit_entry
+
+
+class IsaccFhirException(Exception):
+    """Raised when a FHIR resource or attribute required for ISACC to operate correctly is missing"""
+    pass
 
 
 class IsaccNotFoundError(Exception):
@@ -18,6 +21,10 @@ def resolve_reference(reference_string):
     :param reference_string: i.e. "Patient/2"
     :return: instantiated FHIRClient instance by fetching resource
     """
+    from fhirclient.models.careteam import CareTeam
+    from fhirclient.models.practitioner import Practitioner
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+
     # expand supported class list as needed
     supported_classes = {
         "CareTeam": CareTeam,
@@ -33,6 +40,51 @@ def resolve_reference(reference_string):
     if result is not None:
         return klass(result)
     raise IsaccNotFoundError("{reference_string} NOT FOUND")
+
+
+def first_in_bundle(bundle):
+    """Return first resource in bundle
+
+    :param bundle:  Fresh JSON bundle from FHIR store
+    :return: first resource found in bundle
+    """
+    if bundle['resourceType'] == 'Bundle':
+        if bundle['total'] > 0:
+            return bundle['entry'][0]['resource']
+
+
+def next_in_bundle(bundle):
+    """Generator to manage paging through bundle results
+
+    :param bundle:  Fresh JSON bundle from FHIR store
+
+    Yields each respective resource from the bundle's entry list
+    until exhousted.
+    """
+    def next_in_page(result):
+        if result['resourceType'] == 'Bundle' and result['total'] > 0:
+            for entry in result['entry']:
+                yield entry['resource']
+
+    def next_page(result):
+        while len([link['url'] for link in result["link"] if link['relation'] == 'next']) > 0:
+            next_page_url = [link['url'] for link in result["link"] if link['relation'] == 'next'][0]
+            next_page_url = urlsplit(next_page_url)
+            params = parse_qs(next_page_url.query)
+            result = HAPI_request('GET', params=params)
+            yield result
+
+    # yield each resource from first page
+    for i in next_in_page(bundle):
+        yield i
+
+    # continue through remaining pages
+    for page in next_page(bundle):
+        # yield each resource from each subsequent page
+        for i in next_in_page(page):
+            yield i
+
+    return
 
 
 def HAPI_request(
