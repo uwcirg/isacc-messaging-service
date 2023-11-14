@@ -89,7 +89,7 @@ def assemble_outgoing_counts_email(practitioner, patients):
     html = html_template.format(
         pre_link_msg=msg,
         link_url=patient_list_url,
-        link_suffix_text="to view which of your recipients will be receiving a message.",
+        link_suffix_text="to view which of your recipients will be receiving a message",
         post_link_msg=(
             "If you are not the person who should be getting these messages, contact "
             f'<a href="mailto:{SUPPORT_EMAIL}">your site lead</a>.'),
@@ -112,28 +112,29 @@ def generate_outgoing_counts_emails(dry_run):
     for every practitioner in the system, detailing the number of patients for which
     they have outgoing texts in the next 24 hours.
     """
-    cutoff = datetime.now().astimezone() + timedelta(days=1)
-    known_keepers = []
-    known_skippers = []
+    now = datetime.now().astimezone()
+    cutoff = now + timedelta(days=1)
+    known_keepers = set()
+    known_skippers = set()
 
     def outgoing_patients(patients):
         """helper to return only sublist of patients with qualified outgoing messages"""
-        keepers = []
+        keepers = set()
         for p in patients:
             if p in known_keepers:
-                keepers.append(p)
+                keepers.add(p)
                 continue
             if p in known_skippers:
                 continue
 
             next_outgoing = p.get_extension(NEXT_OUTGOING_URL, attribute="valueDateTime")
-            if next_outgoing and next_outgoing.date < cutoff:
-                keepers.append(p)
-                known_keepers.append(p)
+            if next_outgoing and next_outgoing.date > now and next_outgoing.date < cutoff:
+                keepers.add(p)
+                known_keepers.add(p)
             else:
-                known_skippers.append(p)
+                known_skippers.add(p)
 
-        return keepers
+        return list(keepers)
 
     practitioners = Practitioner.active_practitioners()
     for p in next_in_bundle(practitioners):
