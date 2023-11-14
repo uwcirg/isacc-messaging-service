@@ -186,6 +186,16 @@ class IsaccPatient(Patient):
                     level='debug'
                 )
 
+    def is_test_patient(self):
+        """Shortcut to see if meta.security list includes HTEST value"""
+        test_system = "http://terminology.hl7.org/CodeSystem/v3-ActReason"
+        if not self.meta.security:
+            return
+
+        vals = [i.code for i in self.meta.security if i.system == test_system]
+        if vals and "HTEST" in vals:
+            return True
+
     def persist(self):
         """Persist self state to FHIR store"""
         response = HAPI_request(

@@ -45,7 +45,7 @@ class IsaccPractitioner(Practitioner):
                     return t.value
         raise IsaccFhirException(f"Error: {self} doesn't have an sms contact point on file")
 
-    def practitioner_patients(self):
+    def practitioner_patients(self, include_test_patients=False):
         """Return bundle of patients for which this practitioner is a primary or secondary
 
         :returns: list of Patient objects
@@ -55,7 +55,10 @@ class IsaccPractitioner(Practitioner):
         for ct in next_in_bundle(careteams):
             # Each care team has one patient at subject/reference
             careteam = CareTeam(ct)
-            patients.append(resolve_reference(careteam.subject.reference))
+            patient = resolve_reference(careteam.subject.reference)
+            if not include_test_patients and patient.is_test_patient():
+                continue
+            patients.append(patient)
         return patients
 
     def persist(self):

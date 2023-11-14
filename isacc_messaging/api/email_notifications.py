@@ -103,10 +103,11 @@ def assemble_outgoing_counts_email(practitioner, patients):
 
 
 
-def generate_outgoing_counts_emails(dry_run):
+def generate_outgoing_counts_emails(dry_run, include_test_patients):
     """Generate system emails to practitioners with counts
 
     :param dry_run: set true to generate but not send email
+    :param include_test_patients: set true to include test patients
 
     At a scheduled time every day, this function will be triggered to generate email
     for every practitioner in the system, detailing the number of patients for which
@@ -128,6 +129,7 @@ def generate_outgoing_counts_emails(dry_run):
                 continue
 
             next_outgoing = p.get_extension(NEXT_OUTGOING_URL, attribute="valueDateTime")
+            logging.info(f"{p.id} {len(patients)}")
             if next_outgoing and next_outgoing.date > now and next_outgoing.date < cutoff:
                 keepers.add(p)
                 known_keepers.add(p)
@@ -139,7 +141,7 @@ def generate_outgoing_counts_emails(dry_run):
     practitioners = Practitioner.active_practitioners()
     for p in next_in_bundle(practitioners):
         practitioner = Practitioner(p)
-        practitioners_patients = practitioner.practitioner_patients()
+        practitioners_patients = practitioner.practitioner_patients(include_test_patients=include_test_patients)
         outgoing = outgoing_patients(practitioners_patients)
         if not outgoing:
             logging.debug(f"no qualifying outgoing patients for {practitioner}")
@@ -214,10 +216,11 @@ def assemble_unresponded_email(practitioner, patients):
         "html": html}
 
 
-def generate_unresponded_emails(dry_run):
+def generate_unresponded_emails(dry_run, include_test_patients):
     """Generate system emails to practitioners with counts
 
     :param dry_run: set true to generate but not send email
+    :param include_test_patients: set true to include test patients
 
     At a scheduled time every day, this function will be triggered to generate email
     for every practitioner in the system, detailing the number of patients for which
@@ -249,7 +252,7 @@ def generate_unresponded_emails(dry_run):
     practitioners = Practitioner.active_practitioners()
     for p in next_in_bundle(practitioners):
         practitioner = Practitioner(p)
-        practitioners_patients = practitioner.practitioner_patients()
+        practitioners_patients = practitioner.practitioner_patients(include_test_patients=include_test_patients)
         unresponded = unresponded_patients(practitioners_patients)
         if not unresponded:
             logging.debug(f"no qualifying unresponded patients for {practitioner}")

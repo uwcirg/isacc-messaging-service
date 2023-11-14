@@ -180,12 +180,13 @@ def execute_requests():
 @base_blueprint.cli.command("send-system-emails")
 @click.argument("category", required=True)
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; generate but don't send email")
-def send_system_emails(category, dry_run):
+@click.option("--include-test-patients", is_flag=True, default=False, help="Include test patients")
+def send_system_emails(category, dry_run, include_test_patients):
     from isacc_messaging.api.email_notifications import generate_outgoing_counts_emails, generate_unresponded_emails
     if category == 'unresponded':
-        generate_unresponded_emails(dry_run)
+        generate_unresponded_emails(dry_run, include_test_patients)
     elif category == 'outgoing':
-        generate_outgoing_counts_emails(dry_run)
+        generate_outgoing_counts_emails(dry_run, include_test_patients)
     else:
         click.echo(f"unsupported category: {category}")
 
