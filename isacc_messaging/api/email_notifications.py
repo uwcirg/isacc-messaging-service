@@ -124,7 +124,6 @@ def generate_outgoing_counts_emails(dry_run, include_test_patients):
                 continue
 
             next_outgoing = p.get_extension(NEXT_OUTGOING_URL, attribute="valueDateTime")
-            logging.info(f"{p.id} {len(patients)}")
             if next_outgoing and next_outgoing.date > now and next_outgoing.date < cutoff:
                 keepers.add(p)
                 known_keepers.add(p)
