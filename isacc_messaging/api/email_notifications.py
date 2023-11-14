@@ -78,11 +78,8 @@ def assemble_outgoing_counts_email(practitioner, patients):
 
     subject = f"ISACC {len(patients)} Caring Contact sending today"
     contents = []
-    if primary:
-        contents.append(f"Caring Contact messages will be sent to {len(patients)} of your recipients today.")
-    if secondary:
-        contents.append(f"{len(primary)} of those contacts for whom you are the primary author,")
-        contents.append(f"{len(secondary)} of those contacts for whom you are the secondary author.")
+    contents.append(f"Today Caring Contact messages will be sent to {len(primary)} recipients for")
+    contents.append(f"whom you are the primary author, and {len(secondary)} for whom you are following.")
     msg = " ".join(contents)
     contents.append(f"Click here {patient_list_url} to view which of your recipients will be receiving a message.")
     contents.append("If you are not the person who should be getting these messages, contact your site lead.")
@@ -99,8 +96,6 @@ def assemble_outgoing_counts_email(practitioner, patients):
         "subject": subject,
         "text": " ".join(contents),
         "html": html}
-
-
 
 
 def generate_outgoing_counts_emails(dry_run, include_test_patients):
