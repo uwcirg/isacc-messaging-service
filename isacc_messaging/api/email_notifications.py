@@ -46,8 +46,8 @@ def send_message_received_notification(recipients: list, patient: Patient):
         link_url=link_url,
         link_suffix_text="to view it",
         post_link_msg=(
-            f'<h3><a href="mailto:{SUPPORT_EMAIL}">Send Email</a>'
-            'if you have questions.</h3>'),
+            f'<a href="mailto:{SUPPORT_EMAIL}">Send Email</a>'
+            ' if you have questions.'),
         unsubscribe_link=UNSUB_LINK)
 
     send_email(
