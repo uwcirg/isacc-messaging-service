@@ -236,8 +236,8 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient is None:
-            return "Need patient"
+        if patient is None or not patient.active:
+            return "Need active patient"
 
         care_plan = self.get_careplan(patient)
 
@@ -364,7 +364,7 @@ class IsaccRecordCreator:
         })
         pt = first_in_bundle(pt)
         if not pt:
-            error = "No patient with this phone number"
+            error = "No patient with this phone number" 
             phone = values.get('From')
             audit_entry(
                 error,
@@ -373,6 +373,15 @@ class IsaccRecordCreator:
             )
             return f"{error}: {phone}"
         pt = Patient(pt)
+        if not pt.active:
+            error = "No active patient with this phone number" 
+            phone = values.get('From')
+            audit_entry(
+                error,
+                extra={"from_phone": phone},
+                level='error'
+            )
+            return f"{error}: {phone}"
 
         message = values.get("Body")
         message_priority = self.score_message(message)

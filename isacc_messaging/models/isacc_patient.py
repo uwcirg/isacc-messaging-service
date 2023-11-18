@@ -32,6 +32,16 @@ class IsaccPatient(Patient):
     def active_patients():
         """Execute query for active patients
 
+        NB, returns only patients with active set to true
+        """
+        response = HAPI_request('GET', 'Patient', params={
+            "active": True
+        })
+        return response
+
+    def all_patients():
+        """Execute query for all patients
+
         NB, until status is set on all patients, queries for
         any status/active value will skip those without a value.
         """
@@ -205,4 +215,15 @@ class IsaccPatient(Patient):
             resource_type=self.resource_type,
             resource_id=self.id,
             resource=self.as_json())
+        return response
+
+
+    def update(self, params):
+        """Update self params at FHIR store"""
+        response = HAPI_request(
+            method="PUT",
+            resource_type=self.resource_type,
+            resource_id=self.id,
+            resource=self.as_json(), 
+            params=params)
         return response
