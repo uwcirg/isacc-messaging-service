@@ -208,7 +208,7 @@ def update_patient_extensions(dry_run):
 @click.argument('param_to_update', default='active', help='Parameter to update for the patient')
 @click.argument('value', default='True', help='Value to set for the parameter')
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
-def update_dict(param_to_update, value):
+def update_patient_params(param_to_update, value):
     """Iterate through all patients, update any the parameter values for all of them"""
     if value.lower() in ('true', 'false'):
         value = value.lower() in ('true')  # Convert to boolean

@@ -1,0 +1,43 @@
+{
+  "resourceType": "Patient",
+  "id": "69",
+  "meta": {
+    "versionId": "39",
+    "lastUpdated": "2023-10-19T00:53:21.195+00:00",
+    "source": "#RFawZwTDR1vXuSSq",
+    "security": [ {
+      "system": "http://terminology.hl7.org/CodeSystem/v3-ActReason",
+      "code": "HTEST"
+    } ]
+  },
+  "text": {
+    "status": "generated",
+    "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\"><div class=\"hapiHeaderText\">Dwight <b>SCHRUTE </b></div><table class=\"hapiPropertyTable\"><tbody><tr><td>Date of birth</td><td><span>03 February 1960</span></td></tr></tbody></table></div>"
+  },
+  "extension": [ {
+    "url": "http://isacc.app/time-of-last-unfollowedup-message",
+    "valueDateTime": "2023-04-28T17:49:52.609906+00:00"
+  }, {
+    "url": "http://isacc.app/date-time-of-next-outgoing-message",
+    "valueDateTime": "1973-10-18T12:53:21Z"
+  } ],
+  "identifier": [ {
+    "system": "https://github.com/uwcirg/cosri-patientsearch/counter",
+    "value": "23"
+  } ],
+  "name": [ {
+    "family": "Schrute",
+    "given": [ "Dwight" ]
+  } ],
+  "telecom": [ {
+    "system": "sms",
+    "value": "3602815483"
+  } ],
+  "birthDate": "1960-02-03",
+  "active": false,
+  "generalPractitioner": [ {
+    "reference": "Practitioner/57",
+    "type": "Practitioner",
+    "display": "McRainodes, J.R."
+  } ]
+}
