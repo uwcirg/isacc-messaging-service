@@ -39,6 +39,7 @@ class IsaccPatient(Patient):
         })
         return response
 
+    @staticmethod
     def all_patients():
         """Execute query for all patients
 
