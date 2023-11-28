@@ -1,4 +1,5 @@
 """Module for email utility functions"""
+from email import utils
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from flask import current_app
@@ -19,7 +20,10 @@ def send_email(recipient_emails: list, subject, text, html):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = sender_name
+    msg.add_header("To", ' '.join(recipient_emails))
     msg.add_header("List-Unsubscribe", f"{current_app.config.get('ISACC_APP_URL')}/unsubscribe")
+    msg.add_header("Date", utils.format_datetime(utils.localtime()))
+    msg.add_header("Message-Id", utils.make_msgid())
 
     # Record the MIME types of both parts - text/plain and text/html.
     part1 = MIMEText(text, 'plain')
@@ -54,3 +58,5 @@ def send_email(recipient_emails: list, subject, text, html):
                 'exception': str(e)},
             level='error'
         )
+        # present stack for easier debugging
+        raise e
