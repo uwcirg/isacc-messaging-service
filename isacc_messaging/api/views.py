@@ -205,18 +205,18 @@ def update_patient_extensions(dry_run):
 
 
 @base_blueprint.cli.command("maintenance-update-patient-param")
-@click.argument('param_to_update', default='active', help='Parameter to update for the patient')
-@click.argument('value', default='True', help='Value to set for the parameter')
-# @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
+@click.option('-param_to_update', default='active', help='Parameter to update for the patient')
+@click.option('-value', default='True', help='Value to set for the parameter')
+@click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_patient_params(param_to_update, value):
     """Iterate through all patients, update any the parameter values for all of them"""
     if value.lower() in ('true', 'false'):
         value = value.lower() in ('true')  # Convert to boolean
 
-    from isacc_messaging.models.fhir import next_in_bundle
-    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
-    all_patients = Patient.all_patients()
-    for json_patient in next_in_bundle(all_patients):
-        patient = Patient(json_patient)
-        patient.update({param_to_update:value})
+    # from isacc_messaging.models.fhir import next_in_bundle
+    # from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    # all_patients = Patient.all_patients()
+    # for json_patient in next_in_bundle(all_patients):
+    #     patient = Patient(json_patient)
+    #     patient.update({param_to_update:value})
         
