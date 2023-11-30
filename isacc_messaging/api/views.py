@@ -213,10 +213,10 @@ def update_patient_params(param_to_update, value):
     if value.lower() in ('true', 'false'):
         value = value.lower() in ('true')  # Convert to boolean
 
-    # from isacc_messaging.models.fhir import next_in_bundle
-    # from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
-    # all_patients = Patient.all_patients()
-    # for json_patient in next_in_bundle(all_patients):
-    #     patient = Patient(json_patient)
-    #     patient.update({param_to_update:value})
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    all_patients = Patient.all_patients()
+    for json_patient in next_in_bundle(all_patients):
+        patient = Patient(json_patient)
+        patient.update({param_to_update:value})
         
