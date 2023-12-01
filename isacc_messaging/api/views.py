@@ -204,7 +204,7 @@ def update_patient_extensions(dry_run):
         patient.mark_followup_extension(persist_on_change=not dry_run)
 
 
-@base_blueprint.cli.command("maintenance-reinstate-patients-with-param")
+@base_blueprint.cli.command("maintenance-reinstate-all-patients")
 def update_patient_params():
     """Iterate through all patients, update any the parameter values for all of them"""
     from isacc_messaging.models.fhir import next_in_bundle
