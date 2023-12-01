@@ -218,13 +218,3 @@ class IsaccPatient(Patient):
             resource=self.as_json())
         return response
 
-
-    def update(self, params):
-        """Update self params at FHIR store"""
-        response = HAPI_request(
-            method="PUT",
-            resource_type=self.resource_type,
-            resource_id=self.id,
-            resource=self.as_json(), 
-            params=params)
-        return response
