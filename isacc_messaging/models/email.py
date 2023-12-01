@@ -40,8 +40,8 @@ def send_email(recipient_emails: list, subject, text, html):
 
     try:
         with smtplib.SMTP_SSL(email_server, port, context=context) as server:
-            server.login(sender_email, app_password)
-            server.sendmail(sender_name, recipient_emails, msg.as_string())
+            server.login(user=sender_email, password=app_password)
+            server.sendmail(from_addr=sender_name, to_addrs=recipient_emails, msg=msg.as_string())
             audit_entry(
                 f"Email notification sent",
                 extra={
