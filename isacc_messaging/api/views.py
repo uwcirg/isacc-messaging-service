@@ -225,7 +225,7 @@ def deactivate_patient(patient_id):
     active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
-        if patient.id == patient_id:
+        if patient.id == "52":
             patient.active = False
             patient.persist()
             audit_entry(
