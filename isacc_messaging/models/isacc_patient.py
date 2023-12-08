@@ -229,13 +229,3 @@ class IsaccPatient(Patient):
             resource=self.as_json())
         return response
 
-    def deactivate(self):
-        """Persist self state to FHIR store"""
-        self.active = False
-        response = HAPI_request(
-            method="PUT",
-            resource_type=self.resource_type,
-            resource_id=self.id,
-            resource=self.as_json())
-        return response
-
