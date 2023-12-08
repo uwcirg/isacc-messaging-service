@@ -214,3 +214,31 @@ def update_patient_params():
         patient = Patient(json_patient)
         patient.active = True
         patient.persist()
+
+
+@base_blueprint.cli.command("deactivate_patient")
+@click.argument('patient_id')
+def deactivate_patient(patient_id):
+    """Iterate through all patients, update any the parameter values for all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    all_patients = Patient.get_patient_by_id(patient_id)
+    if len(all_patients) > 1:
+        # Limit to first user
+        all_patients = all_patients[0]
+        
+        audit_entry(
+        f"Multiple patients with {patient_id} returned",
+        level='warn'
+        )
+
+    for json_patient in next_in_bundle(all_patients):
+        patient = Patient(json_patient)
+        patient.active = False
+        patient.persist()
+
+    audit_entry(
+        f"Deactivated a patient {patient_id}",
+        extra={'request.values': dict(request.values)},
+        level='info'
+    )

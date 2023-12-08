@@ -40,6 +40,17 @@ class IsaccPatient(Patient):
         return response
 
     @staticmethod
+    def get_patient_by_id(id):
+        """Execute query for active patients
+
+        NB, returns only patients with active set to true
+        """
+        response = HAPI_request('GET', 'Patient', params={
+            "id": id
+        })
+        return response
+    
+    @staticmethod
     def all_patients():
         """Execute query for all patients
 
@@ -211,6 +222,16 @@ class IsaccPatient(Patient):
 
     def persist(self):
         """Persist self state to FHIR store"""
+        response = HAPI_request(
+            method="PUT",
+            resource_type=self.resource_type,
+            resource_id=self.id,
+            resource=self.as_json())
+        return response
+
+    def deactivate(self):
+        """Persist self state to FHIR store"""
+        self.active = False
         response = HAPI_request(
             method="PUT",
             resource_type=self.resource_type,
