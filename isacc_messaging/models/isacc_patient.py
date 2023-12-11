@@ -35,7 +35,7 @@ class IsaccPatient(Patient):
         NB, returns only patients with active set to true
         """
         response = HAPI_request('GET', 'Patient', params={
-            "active": True
+            "active": "true"
         })
         return response
 
