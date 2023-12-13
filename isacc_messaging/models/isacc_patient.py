@@ -233,6 +233,7 @@ class IsaccPatient(Patient):
         """Persist self state to FHIR store"""
         self_json = self.as_json()
         self_json["active"] = True
+        """Persist self state to FHIR store"""
         response = HAPI_request(
             method="PUT",
             resource_type=self.resource_type,

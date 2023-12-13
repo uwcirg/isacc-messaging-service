@@ -214,10 +214,9 @@ def update_patient_params():
         patient = Patient(json_patient)
         patient.reinstate()
         audit_entry(
-        f"Patient ID{patient.id}",
+        f"Patient with id {patient.id} reinstated",
         level='info'
         )
-        patient.persist()
 
 
 @base_blueprint.cli.command("deactivate_patient")
