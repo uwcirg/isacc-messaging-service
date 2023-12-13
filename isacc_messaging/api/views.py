@@ -212,7 +212,8 @@ def update_patient_params():
     all_patients = Patient.all_patients()
     for json_patient in next_in_bundle(all_patients):
         patient = Patient(json_patient)
-        patient.reinstate()
+        patient.active = True
+        patient.persist()
         audit_entry(
         f"Patient with id {patient.id} reinstated",
         level='info'
@@ -229,7 +230,8 @@ def deactivate_patient(patient_id):
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
         if patient.id == str(patient_id):
-            patient.deactivate()
+            patient.active = False
+            patient.persist()
             audit_entry(
             f"Deactivated a patient {patient_id}",
             level='info'
