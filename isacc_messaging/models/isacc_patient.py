@@ -232,7 +232,7 @@ class IsaccPatient(Patient):
     def reinstate(self):
         """Persist self state to FHIR store"""
         self_json = self.as_json()
-        self_json["active"] = True
+        self_json["active"] = "true"
         """Persist self state to FHIR store"""
         response = HAPI_request(
             method="PUT",
@@ -243,7 +243,7 @@ class IsaccPatient(Patient):
 
     def deactivate(self):
         self_json = self.as_json()
-        self_json["active"] = False
+        self_json["active"] = "false"
         """Persist self state to FHIR store"""
         response = HAPI_request(
             method="PUT",

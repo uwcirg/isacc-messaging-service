@@ -225,7 +225,7 @@ def deactivate_patient(patient_id):
     """Iterate through all patients, update any the parameter values for all of them"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
-    active_patients = Patient.all_patients()
+    active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
         if patient.id == str(patient_id):
