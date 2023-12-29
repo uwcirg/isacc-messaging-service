@@ -40,17 +40,6 @@ class IsaccPatient(Patient):
         return response
 
     @staticmethod
-    def get_patient_by_id(id):
-        """Execute query for active patients
-
-        NB, returns only patients with active set to true
-        """
-        response = HAPI_request('GET', 'Patient', params={
-            "id": id
-        })
-        return response
-    
-    @staticmethod
     def all_patients():
         """Execute query for all patients
 
