@@ -206,7 +206,7 @@ def update_patient_extensions(dry_run):
 
 @base_blueprint.cli.command("maintenance-reinstate-all-patients")
 def update_patient_params():
-    """Iterate through all patients, update any the parameter values for all of them"""
+    """Iterate through all patients, activate all of them"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     all_patients = Patient.all_patients()
@@ -223,10 +223,10 @@ def update_patient_params():
 @base_blueprint.cli.command("deactivate_patient")
 @click.argument('patient_id')
 def deactivate_patient(patient_id):
-    """Iterate through all patients, update any the parameter values for all of them"""
+    """Iterate through all patients, update the active parameter value based on id"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
-    active_patients = Patient.active_patients()
+    active_patients = Patient.all_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
         if patient.id == str(patient_id):
