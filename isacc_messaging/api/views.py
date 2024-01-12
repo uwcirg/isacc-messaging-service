@@ -195,6 +195,11 @@ def send_system_emails(category, dry_run, include_test_patients):
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_patient_extensions(dry_run):
     """Iterate through active patients, update any stale/missing extensions"""
+    # this was a 1 and done migration method.  disable for now
+    raise click.ClickException(
+        "DISABLED: unsafe to run as this will now undo any user marked "
+        "read messages via "
+        "https://github.com/uwcirg/isacc-messaging-client-sof/pull/85")
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
