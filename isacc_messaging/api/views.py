@@ -215,7 +215,7 @@ def update_patient_params():
         patient.active = True
         patient.persist()
         audit_entry(
-        f"Patient with id {patient.id} reinstated",
+        f"Patient {patient.id} active set to true",
         level='info'
         )
 
@@ -223,18 +223,13 @@ def update_patient_params():
 @base_blueprint.cli.command("deactivate_patient")
 @click.argument('patient_id')
 def deactivate_patient(patient_id):
-    """Iterate through all patients, update the active parameter value based on id"""
-    from isacc_messaging.models.fhir import next_in_bundle
+    """Set the active parameter to false based on provided patient id"""
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
-    active_patients = Patient.all_patients()
-    for json_patient in next_in_bundle(active_patients):
-        patient = Patient(json_patient)
-        if patient.id == str(patient_id):
-            patient.active = False
-            patient.persist()
-            audit_entry(
-            f"Deactivated a patient {patient_id}",
-            level='info'
-            )
-            break
-
+    json_patient = Patient.get_patient_by_id(patient_id)
+    patient = Patient(json_patient)
+    patient.active = False
+    patient.persist()
+    audit_entry(
+    f"Patient {patient_id} active set to false",
+    level='info'
+    )

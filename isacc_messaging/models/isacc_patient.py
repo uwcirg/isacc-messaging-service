@@ -49,6 +49,14 @@ class IsaccPatient(Patient):
         response = HAPI_request('GET', 'Patient')
         return response
 
+    @staticmethod
+    def get_patient_by_id(id):
+        """Execute query for all types of patients
+        to return a patient with the specified id.
+        """
+        response = HAPI_request('GET', 'Patient', params={"id": id})
+        return response
+
     def get_phone_number(self) -> str:
         if self.telecom:
             for t in self.telecom:
