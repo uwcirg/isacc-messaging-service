@@ -360,7 +360,8 @@ class IsaccRecordCreator:
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From', "+1").replace("+1", "")
+            'telecom': values.get('From', "+1").replace("+1", ""),
+            "active": "true",
         })
         pt = first_in_bundle(pt)
         if not pt:
@@ -373,15 +374,6 @@ class IsaccRecordCreator:
             )
             return f"{error}: {phone}"
         pt = Patient(pt)
-        if not pt.active:
-            error = "No active patient with this phone number" 
-            phone = values.get('From')
-            audit_entry(
-                error,
-                extra={"from_phone": phone},
-                level='error'
-            )
-            return f"{error}: {phone}"
 
         message = values.get("Body")
         message_priority = self.score_message(message)
