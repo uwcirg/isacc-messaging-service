@@ -361,7 +361,7 @@ class IsaccRecordCreator:
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
             'telecom': values.get('From', "+1").replace("+1", ""),
-            "active": "true",
+            'active': 'true',
         })
         pt = first_in_bundle(pt)
         if not pt:
