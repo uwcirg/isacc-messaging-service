@@ -236,8 +236,8 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient is None or patient.active != True:
-            return "Need active patient"
+        if patient is None or getattr(patient, "active", False):
+            raise ValueError("Missing active patient")
 
         care_plan = self.get_careplan(patient)
 
