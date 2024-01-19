@@ -32,10 +32,29 @@ class IsaccPatient(Patient):
     def active_patients():
         """Execute query for active patients
 
+        NB, returns only patients with active set to true
+        """
+        response = HAPI_request('GET', 'Patient', params={
+            "active": "true"
+        })
+        return response
+
+    @staticmethod
+    def all_patients():
+        """Execute query for all patients
+
         NB, until status is set on all patients, queries for
         any status/active value will skip those without a value.
         """
         response = HAPI_request('GET', 'Patient')
+        return response
+
+    @staticmethod
+    def get_patient_by_id(id):
+        """Execute query for all types of patients
+        to return a patient with the specified id.
+        """
+        response = HAPI_request('GET', 'Patient', resource_id=id)
         return response
 
     def get_phone_number(self) -> str:

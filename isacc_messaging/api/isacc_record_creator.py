@@ -236,8 +236,8 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient is None:
-            return "Need patient"
+        if patient is None or getattr(patient, "active", False):
+            raise ValueError("Missing active patient")
 
         care_plan = self.get_careplan(patient)
 
@@ -360,7 +360,8 @@ class IsaccRecordCreator:
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From', "+1").replace("+1", "")
+            'telecom': values.get('From', "+1").replace("+1", ""),
+            'active': 'true',
         })
         pt = first_in_bundle(pt)
         if not pt:

@@ -202,3 +202,34 @@ def update_patient_extensions(dry_run):
         patient = Patient(json_patient)
         patient.mark_next_outgoing(persist_on_change=not dry_run)
         patient.mark_followup_extension(persist_on_change=not dry_run)
+
+
+@base_blueprint.cli.command("maintenance-reinstate-all-patients")
+def update_patient_params():
+    """Iterate through all patients, activate all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    all_patients = Patient.all_patients()
+    for json_patient in next_in_bundle(all_patients):
+        patient = Patient(json_patient)
+        patient.active = True
+        patient.persist()
+        audit_entry(
+        f"Patient {patient.id} active set to true",
+        level='info'
+        )
+
+
+@base_blueprint.cli.command("deactivate_patient")
+@click.argument('patient_id')
+def deactivate_patient(patient_id):
+    """Set the active parameter to false based on provided patient id"""
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    json_patient = Patient.get_patient_by_id(patient_id)
+    patient = Patient(json_patient)
+    patient.active = False
+    patient.persist()
+    audit_entry(
+    f"Patient {patient_id} active set to false",
+    level='info'
+    )
