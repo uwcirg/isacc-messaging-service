@@ -407,6 +407,7 @@ class IsaccRecordCreator:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
+            
         successes = []
         errors = []
         skipped_crs = []
@@ -428,7 +429,16 @@ class IsaccRecordCreator:
                 # like next outgoing message time
                 skipped_crs.append(cr)
                 continue
-            self.process_cr(errors, cr, successes)
+            try:
+                self.process_cr(cr, successes)
+            except Exception as e:
+                audit_entry(
+                    "Failed to send the message",
+                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": str(e)},
+                    level='exception'
+                )
+                # Display Twilio Error in a human readable form
+                errors.append({'id': cr.id, 'error': str(e)})
 
         for cr in skipped_crs:
             cr.status = "revoked"
@@ -447,11 +457,9 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, errors, cr, successes):
+    def process_cr(self, cr, successes):
         try:
             status = self.convert_communicationrequest_to_communication(cr=cr)
             successes.append({'id': cr.id, 'status': status})
         except Exception as e:
-            errors.append({'id': cr.id, 'error': e})
-            # impossible to track errors - re-raise for stack in stderr
             raise e
