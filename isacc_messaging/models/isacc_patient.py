@@ -29,6 +29,15 @@ class IsaccPatient(Patient):
         return f"{self.resource_type}/{self.id}"
 
     @staticmethod
+    def custom_patients(params):
+        """Execute custom query for all patients
+
+        NB, returns only patients that fit the params
+        """
+        response = HAPI_request('GET', 'Patient', params=params)
+        return response
+
+    @staticmethod
     def active_patients():
         """Execute query for active patients
 

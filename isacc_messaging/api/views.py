@@ -1,6 +1,6 @@
 import click
 import logging
-
+from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
@@ -205,7 +205,7 @@ def update_patient_extensions(dry_run):
 
 
 @base_blueprint.cli.command("maintenance-reinstate-all-patients")
-def update_patient_params():
+def update_patient_active():
     """Iterate through all patients, activate all of them"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
@@ -216,6 +216,22 @@ def update_patient_params():
         patient.persist()
         audit_entry(
         f"Patient {patient.id} active set to true",
+        level='info'
+        )
+
+
+@base_blueprint.cli.command("maintenance-add-telecom-period-all-patients")
+def update_patient_telecom():
+    """Iterate through patients, add telecom start period to all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    patients_without_telecom_period = Patient.custom_patients({"telecom:missing": "true"})
+    for json_patient in next_in_bundle(patients_without_telecom_period):
+        patient = Patient(json_patient)
+        patient.telecom.period.start = datetime.now(timezone.utc)
+        patient.persist()
+        audit_entry(
+        f"Patient {patient.id} active telecom period set to start now",
         level='info'
         )
 

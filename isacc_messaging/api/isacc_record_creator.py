@@ -434,7 +434,7 @@ class IsaccRecordCreator:
             except Exception as e:
                 audit_entry(
                     "Failed to send the message",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": str(e)},
+                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
                     level='exception'
                 )
                 # Display Twilio Error in a human readable form
