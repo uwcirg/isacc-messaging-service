@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 from typing import List, Tuple
 
@@ -439,6 +439,7 @@ class IsaccRecordCreator:
                 telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
                 for telecom_entry in patient.telecom
             )
+            occurrence_utc = cr.occurrenceDateTime.date.replace(tzinfo=timezone.utc)
 
             if cr.occurrenceDateTime.date < cutoff:
                 # Anything older than cutoff will never be sent (#1861758)
@@ -447,7 +448,7 @@ class IsaccRecordCreator:
                 skipped_crs.append(cr)
                 continue
             if patient_unsubscribed:
-                if cr.occurrenceDateTime.date < now:
+                if occurrence_utc < datetime.now(timezone.utc):
                     # Skip the messages scheduled to send if user unsubscribed
                     skipped_crs.append(cr)
                 # Do not cancel future sms
