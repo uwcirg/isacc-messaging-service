@@ -104,8 +104,8 @@ class IsaccRecordCreator:
             return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
+        patient = resolve_reference(cr.recipient[0].reference)
         try:
-            patient = resolve_reference(cr.recipient[0].reference)
             if not patient.generalPractitioner:
                 practitioner=None
             else:
@@ -117,6 +117,13 @@ class IsaccRecordCreator:
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
+            for telecom_entry in patient.telecom:
+                if telecom_entry.system.lower() == "sms":
+                    # The error is raised when the user has unscubscribed 
+                    # mark this user as inactive for the future CRs
+                    telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+            patient.persist()
+
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
@@ -236,7 +243,7 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient is None or getattr(patient, "active", False):
+        if patient is None:
             raise ValueError("Missing active patient")
 
         care_plan = self.get_careplan(patient)
@@ -376,6 +383,11 @@ class IsaccRecordCreator:
         pt = Patient(pt)
 
         message = values.get("Body")
+        # if the user requested to resubscribe, mark him as active
+        if "start" in message.lower():
+            sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
+            sms_telecom_entry.period.end = None
+            pt.persist()
         message_priority = self.score_message(message)
 
         return self.generate_incoming_message(
@@ -423,10 +435,18 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            if cr.occurrenceDateTime.date < cutoff:
-                # anything older than cutoff will never be sent (#1861758)
+            patient = resolve_reference(cr.recipient[0].reference)
+            patient_unsubscribed = any(
+                telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
+                for telecom_entry in patient.telecom
+            )
+
+            if cr.occurrenceDateTime.date < cutoff or patient_unsubscribed:
+                # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
+                # Also, if the user has unscubscribed from messages, do not send
+                # no error should be raised
                 skipped_crs.append(cr)
                 continue
             try:
