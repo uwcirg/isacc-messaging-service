@@ -440,13 +440,16 @@ class IsaccRecordCreator:
                 for telecom_entry in patient.telecom
             )
 
-            if cr.occurrenceDateTime.date < cutoff or patient_unsubscribed:
+            if cr.occurrenceDateTime.date < cutoff:
                 # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
-                # Also, if the user has unscubscribed from messages, do not send
-                # no error should be raised
                 skipped_crs.append(cr)
+                continue
+            if patient_unsubscribed:
+                # Also, if the user already unscubscribed from messages, do not send
+                # no error should be raised
+                # Do not cancel, in case user resubscribes in time
                 continue
             try:
                 self.process_cr(cr, successes)
