@@ -447,9 +447,10 @@ class IsaccRecordCreator:
                 skipped_crs.append(cr)
                 continue
             if patient_unsubscribed:
-                # Also, if the user already unscubscribed from messages, do not send
-                # no error should be raised
-                # Do not cancel, in case user resubscribes in time
+                if cr.occurrenceDateTime.date < now:
+                    # Skip the messages scheduled to send if user unsubscribed
+                    skipped_crs.append(cr)
+                # Do not cancel future sms
                 continue
             try:
                 self.process_cr(cr, successes)
