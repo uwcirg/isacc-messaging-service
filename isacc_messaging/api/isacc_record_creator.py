@@ -117,11 +117,11 @@ class IsaccRecordCreator:
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
-            # The error is raised when the user has unscubscribed 
-            # mark this user as inactive for the future CRs
-            sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
-            sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
-            patient.persist()
+            # In case of unsubcribed patient, mark as unsubscribed
+            if ex.code == 21610:
+                sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
+                sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+                patient.persist()
 
             audit_entry(
                 "Twilio exception",
@@ -382,8 +382,8 @@ class IsaccRecordCreator:
         pt = Patient(pt)
 
         message = values.get("Body")
-        # if the user requested to resubscribe, mark him as active
-        if "start" == message.lower():
+        # if the user requested to resubscribe, mark patient as active
+        if "start" == message.lower().strip():
             sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
             sms_telecom_entry.period.end = None
             pt.persist()
@@ -434,7 +434,6 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            occurrence_utc = cr.occurrenceDateTime.date.replace(tzinfo=timezone.utc)
             patient = resolve_reference(cr.recipient[0].reference)
 
             # Happens when the patient removes their phone number completely.
@@ -461,8 +460,8 @@ class IsaccRecordCreator:
                 # like next outgoing message time
                 skipped_crs.append(cr)
                 continue
-            if patient_unsubscribed:
-                if occurrence_utc < datetime.now(timezone.utc):
+            if patient_unsubscribed or not patient.active:
+                if cr.occurrenceDateTime.date < now:
                     # Skip the messages scheduled to send if user unsubscribed
                     skipped_crs.append(cr)
                 # Do not cancel future sms
