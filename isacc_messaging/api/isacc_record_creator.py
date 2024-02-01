@@ -434,12 +434,26 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            patient = resolve_reference(cr.recipient[0].reference)
-            patient_unsubscribed = any(
-                telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
-                for telecom_entry in patient.telecom
-            )
             occurrence_utc = cr.occurrenceDateTime.date.replace(tzinfo=timezone.utc)
+            patient = resolve_reference(cr.recipient[0].reference)
+
+            # Happens when the patient removes their phone number completely.
+            # Should not occur in production.
+            try:
+                patient_unsubscribed = any(
+                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
+                    for telecom_entry in patient.telecom
+                )
+            except Exception as e:
+                skipped_crs.append(cr)
+                audit_entry(
+                    f"Failed to send the message, {patient} does not have phone number",
+                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
+                    level='exception'
+                )
+                # Display Twilio Error in a human readable form
+                errors.append({'id': cr.id, 'error': str(e)})
+                continue
 
             if cr.occurrenceDateTime.date < cutoff:
                 # Anything older than cutoff will never be sent (#1861758)
@@ -482,8 +496,5 @@ class IsaccRecordCreator:
         return successes, errors
 
     def process_cr(self, cr, successes):
-        try:
-            status = self.convert_communicationrequest_to_communication(cr=cr)
-            successes.append({'id': cr.id, 'status': status})
-        except Exception as e:
-            raise e
+        status = self.convert_communicationrequest_to_communication(cr=cr)
+        successes.append({'id': cr.id, 'status': status})
