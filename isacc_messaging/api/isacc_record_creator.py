@@ -384,7 +384,7 @@ class IsaccRecordCreator:
 
         message = values.get("Body")
         # if the user requested to resubscribe, mark him as active
-        if "start" in message.lower():
+        if "start" == message.lower():
             sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
             sms_telecom_entry.period.end = None
             pt.persist()
