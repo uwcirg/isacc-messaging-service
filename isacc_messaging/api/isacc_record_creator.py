@@ -117,11 +117,10 @@ class IsaccRecordCreator:
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
-            for telecom_entry in patient.telecom:
-                if telecom_entry.system.lower() == "sms":
-                    # The error is raised when the user has unscubscribed 
-                    # mark this user as inactive for the future CRs
-                    telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+            # The error is raised when the user has unscubscribed 
+            # mark this user as inactive for the future CRs
+            sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
+            sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
             patient.persist()
 
             audit_entry(
