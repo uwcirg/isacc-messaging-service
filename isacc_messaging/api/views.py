@@ -1,6 +1,6 @@
 import click
 import logging
-
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
@@ -205,7 +205,7 @@ def update_patient_extensions(dry_run):
 
 
 @base_blueprint.cli.command("maintenance-reinstate-all-patients")
-def update_patient_params():
+def update_patient_active():
     """Iterate through all patients, activate all of them"""
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
@@ -218,6 +218,33 @@ def update_patient_params():
         f"Patient {patient.id} active set to true",
         level='info'
         )
+
+
+@base_blueprint.cli.command("maintenance-add-telecom-period-start-all-patients")
+def update_patient_telecom():
+    """Iterate through patients, add telecom start period to all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    import fhirclient.models.period as period
+    from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
+    patients_without_telecom_period = Patient.all_patients()
+    new_period = period.Period()
+    # Get the current time in UTC
+    current_time = datetime.utcnow()
+    # Format the current time as per the required format
+    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    new_period.start = FHIRDate(formatted_time)
+    for json_patient in next_in_bundle(patients_without_telecom_period):
+        patient = Patient(json_patient)
+        if patient.telecom:
+            for telecom_entry in patient.telecom:
+                if telecom_entry.system.lower() == "sms" and not telecom_entry.period:
+                    telecom_entry.period = new_period
+                    patient.persist()
+                    audit_entry(
+                    f"Patient {patient.id} active telecom period set to start now",
+                    level='info'
+                    )
 
 
 @base_blueprint.cli.command("deactivate_patient")

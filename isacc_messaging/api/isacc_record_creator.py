@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 from typing import List, Tuple
 
@@ -104,8 +104,8 @@ class IsaccRecordCreator:
             return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
 
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
+        patient = resolve_reference(cr.recipient[0].reference)
         try:
-            patient = resolve_reference(cr.recipient[0].reference)
             if not patient.generalPractitioner:
                 practitioner=None
             else:
@@ -117,6 +117,12 @@ class IsaccRecordCreator:
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
+            # In case of unsubcribed patient, mark as unsubscribed
+            if ex.code == 21610:
+                sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
+                sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+                patient.persist()
+
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
@@ -236,7 +242,7 @@ class IsaccRecordCreator:
         if priority is None:
             priority = "routine"
 
-        if patient is None or getattr(patient, "active", False):
+        if patient is None:
             raise ValueError("Missing active patient")
 
         care_plan = self.get_careplan(patient)
@@ -376,6 +382,11 @@ class IsaccRecordCreator:
         pt = Patient(pt)
 
         message = values.get("Body")
+        # if the user requested to resubscribe, mark patient as active
+        if "start" == message.lower().strip():
+            sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
+            sms_telecom_entry.period.end = None
+            pt.persist()
         message_priority = self.score_message(message)
 
         return self.generate_incoming_message(
@@ -407,6 +418,7 @@ class IsaccRecordCreator:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
+            
         successes = []
         errors = []
         skipped_crs = []
@@ -422,13 +434,48 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
+            patient = resolve_reference(cr.recipient[0].reference)
+
+            # Happens when the patient removes their phone number completely.
+            # Should not occur in production.
+            try:
+                patient_unsubscribed = any(
+                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
+                    for telecom_entry in patient.telecom
+                )
+            except Exception as e:
+                skipped_crs.append(cr)
+                audit_entry(
+                    f"Failed to send the message, {patient} does not have phone number",
+                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
+                    level='exception'
+                )
+                # Display Twilio Error in a human readable form
+                errors.append({'id': cr.id, 'error': str(e)})
+                continue
+
             if cr.occurrenceDateTime.date < cutoff:
-                # anything older than cutoff will never be sent (#1861758)
+                # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
                 skipped_crs.append(cr)
                 continue
-            self.process_cr(errors, cr, successes)
+            if patient_unsubscribed or not patient.active:
+                if cr.occurrenceDateTime.date < now:
+                    # Skip the messages scheduled to send if user unsubscribed
+                    skipped_crs.append(cr)
+                # Do not cancel future sms
+                continue
+            try:
+                self.process_cr(cr, successes)
+            except Exception as e:
+                audit_entry(
+                    "Failed to send the message",
+                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
+                    level='exception'
+                )
+                # Display Twilio Error in a human readable form
+                errors.append({'id': cr.id, 'error': str(e)})
 
         for cr in skipped_crs:
             cr.status = "revoked"
@@ -447,11 +494,6 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, errors, cr, successes):
-        try:
-            status = self.convert_communicationrequest_to_communication(cr=cr)
-            successes.append({'id': cr.id, 'status': status})
-        except Exception as e:
-            errors.append({'id': cr.id, 'error': e})
-            # impossible to track errors - re-raise for stack in stderr
-            raise e
+    def process_cr(self, cr, successes):
+        status = self.convert_communicationrequest_to_communication(cr=cr)
+        successes.append({'id': cr.id, 'status': status})
