@@ -1,10 +1,13 @@
+from functools import wraps
 import click
 import logging
 from datetime import datetime
 from flask import Blueprint, jsonify, request
+from flask import current_app
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
+from twilio.request_validator import RequestValidator
 
 base_blueprint = Blueprint('base', __name__, cli_group=None)
 
@@ -100,7 +103,31 @@ def message_status_update():
     return '', 204
 
 
+def validate_twilio_request(f):
+    """Validates that incoming requests genuinely originated from Twilio"""
+    @wraps(f)
+    def twilio_validation_decorated(*args, **kwargs):
+        validator = RequestValidator(current_app.config.get('TWILIO_AUTH_TOKEN'))
+        # Validate the request is from Twilio using its
+        # URL, POST data, and X-TWILIO-SIGNATURE header
+        request_valid = validator.validate(
+            request.url,
+            request.form,
+            request.headers.get('X-TWILIO-SIGNATURE', ''))
+
+        if not request_valid:
+            audit_entry(
+                f"sms call from not from Twilio",
+                extra={'request.values': dict(request.values)},
+                level='error'
+            )
+            return '', 403
+        return f(*args, **kwargs)
+    return twilio_validation_decorated
+
+
 @base_blueprint.route("/sms", methods=['GET','POST'])
+@validate_twilio_request
 def incoming_sms():
     audit_entry(
         f"Call to /sms webhook",
@@ -131,6 +158,7 @@ def incoming_sms():
 
 
 @base_blueprint.route("/sms-handler", methods=['GET','POST'])
+@validate_twilio_request
 def incoming_sms_handler():
     audit_entry(
         f"Received call to /sms-handler webhook (not desired)",
@@ -215,8 +243,8 @@ def update_patient_active():
         patient.active = True
         patient.persist()
         audit_entry(
-        f"Patient {patient.id} active set to true",
-        level='info'
+            f"Patient {patient.id} active set to true",
+            level='info'
         )
 
 
@@ -242,8 +270,8 @@ def update_patient_telecom():
                     telecom_entry.period = new_period
                     patient.persist()
                     audit_entry(
-                    f"Patient {patient.id} active telecom period set to start now",
-                    level='info'
+                        f"Patient {patient.id} active telecom period set to start now",
+                        level='info'
                     )
 
 
@@ -257,6 +285,6 @@ def deactivate_patient(patient_id):
     patient.active = False
     patient.persist()
     audit_entry(
-    f"Patient {patient_id} active set to false",
-    level='info'
+        f"Patient {patient_id} active set to false",
+        level='info'
     )
