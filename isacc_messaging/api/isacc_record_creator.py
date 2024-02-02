@@ -371,7 +371,7 @@ class IsaccRecordCreator:
         })
         pt = first_in_bundle(pt)
         if not pt:
-            error = "No patient with this phone number"
+            error = "No active patient with this phone number"
             phone = values.get('From')
             audit_entry(
                 error,
