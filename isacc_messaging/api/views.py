@@ -106,6 +106,10 @@ def message_status_update():
         )
         return ex, 500
     if result is not None:
+        audit_entry(
+            f"on_twilio_message_status_update generated error {result}",
+            level='error'
+        )
         return result, 200
     return '', 204
 
