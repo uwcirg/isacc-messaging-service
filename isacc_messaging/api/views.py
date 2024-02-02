@@ -97,9 +97,16 @@ def message_status_update():
     )
 
     record_creator = IsaccRecordCreator()
-    result = record_creator.on_twilio_message_status_update(request.values)
+    try:
+        result = record_creator.on_twilio_message_status_update(request.values)
+    except Exception as ex:
+        audit_entry(
+            f"on_twilio_message_status_update generated error {ex}",
+            level='error'
+        )
+        return ex, 500
     if result is not None:
-        return result, 500
+        return result, 200
     return '', 204
 
 
