@@ -117,7 +117,7 @@ def validate_twilio_request(f):
 
         if not request_valid:
             audit_entry(
-                f"sms call from not from Twilio",
+                f"sms request not from Twilio",
                 extra={'request.values': dict(request.values)},
                 level='error'
             )
@@ -138,6 +138,7 @@ def incoming_sms():
         record_creator = IsaccRecordCreator()
         result = record_creator.on_twilio_message_received(request.values)
     except Exception as e:
+        # Unexpected error
         import traceback, sys
         exc = sys.exc_info()[0]
         stack = traceback.extract_stack()
@@ -150,10 +151,13 @@ def incoming_sms():
             level="error")
         return stackstr, 500
     if result is not None:
+        # Occurs when message is incoming from unknown phone 
+        # or request is coming from a subscribed phone number, but 
+        # internal logic renders it invalid
         audit_entry(
             f"on_twilio_message_received generated error {result}",
             level='error')
-        return result, 500
+        return result, 200
     return '', 204
 
 
