@@ -308,7 +308,7 @@ class IsaccRecordCreator:
                 extra={"message_sid": message_sid},
                 level='error'
             )
-            return f"{error}: {message_sid}"
+            raise IsaccTwilioError(f"ERROR! {error}: {message_sid}")
 
         cr = CommunicationRequest(cr)
         patient = resolve_reference(cr.recipient[0].reference)

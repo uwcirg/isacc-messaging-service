@@ -97,9 +97,14 @@ def message_status_update():
     )
 
     record_creator = IsaccRecordCreator()
-    result = record_creator.on_twilio_message_status_update(request.values)
-    if result is not None:
-        return result, 500
+    try:
+        record_creator.on_twilio_message_status_update(request.values)
+    except Exception as ex:
+        audit_entry(
+            f"on_twilio_message_status_update generated error {ex}",
+            level='error'
+        )
+        return ex, 200
     return '', 204
 
 
@@ -149,7 +154,7 @@ def incoming_sms():
         audit_entry(
             f"on_twilio_message_received generated: {stackstr}",
             level="error")
-        return stackstr, 500
+        return stackstr, 200
     if result is not None:
         # Occurs when message is incoming from unknown phone 
         # or request is coming from a subscribed phone number, but 
