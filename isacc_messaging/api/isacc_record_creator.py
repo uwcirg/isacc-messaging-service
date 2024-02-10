@@ -117,12 +117,15 @@ class IsaccRecordCreator:
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
-            # In case of unsubcribed patient, mark as unsubscribed
             if ex.code == 21610:
+                # In case of unsubcribed patient, mark as unsubscribed
                 sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
                 sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
                 patient.persist()
-
+                cr.status = "on-hold"
+            else:
+                # For other causes of failed communication, mark the reason for failed request as unknown
+                cr.status = "unknown"
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
@@ -366,8 +369,8 @@ class IsaccRecordCreator:
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From', "+1").replace("+1", ""),
-            'active': 'true',
+            "telecom": values.get("From", "+1").replace("+1", ""),
+            "active": "true",
         })
         pt = first_in_bundle(pt)
         if not pt:
@@ -444,6 +447,7 @@ class IsaccRecordCreator:
                     for telecom_entry in patient.telecom
                 )
             except Exception as e:
+                cr.status = "on-hold"
                 skipped_crs.append(cr)
                 audit_entry(
                     f"Failed to send the message, {patient} does not have phone number",
@@ -458,9 +462,14 @@ class IsaccRecordCreator:
                 # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
+                cr.status = "revoked"
                 skipped_crs.append(cr)
                 continue
             if patient_unsubscribed or not patient.active:
+                if patient_unsubscribed:
+                    cr.status = "on-hold"
+                else:
+                    cr.status = "revoked"
                 if cr.occurrenceDateTime.date < now:
                     # Skip the messages scheduled to send if user unsubscribed
                     skipped_crs.append(cr)
@@ -474,18 +483,17 @@ class IsaccRecordCreator:
                     extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
                     level='exception'
                 )
-                # Display Twilio Error in a human readable form
+                skipped_crs.append(cr)
                 errors.append({'id': cr.id, 'error': str(e)})
 
         for cr in skipped_crs:
-            cr.status = "revoked"
             HAPI_request(
                 "PUT",
                 "CommunicationRequest",
                 resource_id=cr.id,
                 resource=cr.as_json())
             audit_entry(
-                f"Skipped CommunicationRequest({cr.id}); status set to revoked",
+                f"Skipped CommunicationRequest({cr.id}); status set to {cr.status}",
                 extra={"CommunicationRequest": cr.as_json()})
             # as that message was likely the next-outgoing for the patient,
             # update the extension used to track next-outgoing-message time
