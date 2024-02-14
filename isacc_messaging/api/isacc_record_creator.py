@@ -56,7 +56,7 @@ class IsaccRecordCreator:
     def __init__(self):
         pass
 
-    def convert_communicationrequest_to_communication(self, cr: CommunicationRequest):
+    def dispatch_cr(self, cr: CommunicationRequest):
         if cr.dispatched():
             return cr.dispatched_message()
 
@@ -394,5 +394,5 @@ class IsaccRecordCreator:
         return successes, errors
 
     def process_cr(self, cr: CommunicationRequest, successes: list):
-        status = self.convert_communicationrequest_to_communication(cr=cr)
+        status = self.dispatch_cr(cr=cr)
         successes.append({'id': cr.id, 'status': status})
