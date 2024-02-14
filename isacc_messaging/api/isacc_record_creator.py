@@ -1,10 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import re
 from typing import List, Tuple
 
-from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
-from fhirclient.models.identifier import Identifier
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
@@ -58,50 +56,9 @@ class IsaccRecordCreator:
     def __init__(self):
         pass
 
-    def __create_communication_from_request(self, cr):
-        if cr.category[0].coding[0].code == 'isacc-manually-sent-message':
-            code = 'isacc-manually-sent-message'
-        else:
-            code = "isacc-auto-sent-message"
-        return {
-            "resourceType": "Communication",
-            "basedOn": [{"reference": f"CommunicationRequest/{cr.id}"}],
-            "partOf": [{"reference": f"{cr.basedOn[0].reference}"}],
-            "category": [{
-                "coding": [{
-                    "system": "https://isacc.app/CodeSystem/communication-type",
-                    "code": code
-                }]
-            }],
-
-            "payload": [p.as_json() for p in cr.payload],
-            "sent": datetime.now().astimezone().isoformat(),
-            "sender": cr.sender.as_json() if cr.sender else None,
-            "recipient": [r.as_json() for r in cr.recipient],
-            "medium": [{
-                "coding": [{
-                    "system": "http://terminology.hl7.org/ValueSet/v3-ParticipationMode",
-                    "code": "SMSWRIT"
-                }]
-            }],
-            "note": [n.as_json() for n in cr.note] if cr.note else None,
-            "status": "completed"
-        }
-
-    def convert_communicationrequest_to_communication(self, cr):
-        if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
-            sid = ""
-            status = ""
-            as_of = ""
-            for i in cr.identifier:
-                for e in i.extension:
-                    if e.url == "http://isacc.app/twilio-message-status":
-                        status = e.valueCode
-                    if e.url == "http://isacc.app/twilio-message-status-updated":
-                        as_of = e.valueDateTime.isostring
-                if i.system == "http://isacc.app/twilio-message-sid":
-                    sid = i.value
-            return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
+    def convert_communicationrequest_to_communication(self, cr: CommunicationRequest):
+        if cr.dispatched():
+            return cr.dispatched_message()
 
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         patient = resolve_reference(cr.recipient[0].reference)
@@ -119,9 +76,7 @@ class IsaccRecordCreator:
         except TwilioRestException as ex:
             if ex.code == 21610:
                 # In case of unsubcribed patient, mark as unsubscribed
-                sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
-                sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
-                patient.persist()
+                patient.unsubscribe()
                 cr.status = "on-hold"
             else:
                 # For other causes of failed communication, mark the reason for failed request as unknown
@@ -141,30 +96,12 @@ class IsaccRecordCreator:
             )
             raise IsaccTwilioError(f"ERROR! Message status is neither sent nor queued. It was {result.status}")
         else:
-            cr.payload[0].contentString = expanded_payload
-            if not cr.identifier:
-                cr.identifier = []
-            cr.identifier.append(Identifier({
-                "system": "http://isacc.app/twilio-message-sid",
-                "value": result.sid,
-                "extension": [
-                    {
-                        "url": "http://isacc.app/twilio-message-status",
-                        "valueCode": result.status
-                    },
-                    {
-                        "url": "http://isacc.app/twilio-message-status-updated",
-                        "valueDateTime": datetime.now().astimezone().isoformat()
-                    },
-                ]
-            }))
-            updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
+            updated_cr = cr.mark_dispatched(expanded_payload, result)
             audit_entry(
                 f"Updated CommunicationRequest with Twilio SID:",
                 extra={"resource": updated_cr},
                 level='debug'
             )
-
             return f"Twilio message dispatched (status={result.status})"
 
     def send_twilio_sms(self, message, to_phone, from_phone=None):
@@ -192,51 +129,6 @@ class IsaccRecordCreator:
         )
         return message
 
-    def get_careplan(self, patient: Patient) -> CarePlan:
-        result = HAPI_request(
-            'GET', 'CarePlan',
-            params={
-                "subject": f"Patient/{patient.id}",
-                "category": "isacc-message-plan",
-                "status": "active",
-                "_sort": "-_lastUpdated"})
-
-        result = first_in_bundle(result)
-        if result is not None:
-            return CarePlan(result)
-
-    def get_care_team_emails(self, patient: Patient) -> list:
-        emails = set()  # make sure to return unique values
-        care_plan = self.get_careplan(patient)
-        if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
-            if len(care_plan.careTeam) > 1:
-                audit_entry(
-                    "patient has more than one care team",
-                    extra={"Patient": patient.id},
-                    level='warn'
-                )
-            # get the referenced CareTeam resource from the care plan
-            # please see https://www.pivotaltracker.com/story/show/185407795
-            # carePlan.careTeam now includes those that follow the patient
-            care_team = resolve_reference(care_plan.careTeam[0].reference)
-            if care_team and care_team.participant:
-                # format of participants: [{member: {reference: Practitioner/1}}]
-                for participant in care_team.participant:
-                    gp = resolve_reference(participant.member.reference)
-                    if gp.resource_type != 'Practitioner':
-                        continue
-                    for t in gp.telecom:
-                        if t.system == 'email':
-                            emails.add(t.value)
-
-        if not emails:
-            audit_entry(
-                "no practitioner email to notify",
-                extra={"Patient": patient.id},
-                level='warn'
-            )
-        return list(emails)
-
     def generate_incoming_message(self, message, time: datetime = None, patient: Patient=None, priority=None, themes=None,
                                   twilio_sid=None):
         if priority and priority not in ("routine", "urgent", "stat"):
@@ -248,7 +140,7 @@ class IsaccRecordCreator:
         if patient is None:
             raise ValueError("Missing active patient")
 
-        care_plan = self.get_careplan(patient)
+        care_plan = patient.get_careplan()
 
         if not care_plan:
             error = "No CarePlan for this patient:"
@@ -292,9 +184,10 @@ class IsaccRecordCreator:
         )
         # look for participating practitioners in patient's care team
         # which always includes the generalPractitioners
-        notify_emails = self.get_care_team_emails(patient)
-        send_message_received_notification(notify_emails, patient)
-        patient.mark_followup_extension()
+        notify_emails = patient.get_care_team_emails()
+        if len(notify_emails) > 0:
+            send_message_received_notification(notify_emails, patient)
+            patient.mark_followup_extension()
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
@@ -332,7 +225,7 @@ class IsaccRecordCreator:
                 'based-on': f"CommunicationRequest/{cr.id}"
             }))
             if existing_comm is None:
-                c = self.__create_communication_from_request(cr)
+                c = cr.create_communication_from_request()
                 c = Communication(c)
 
                 new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
@@ -387,9 +280,7 @@ class IsaccRecordCreator:
         message = values.get("Body")
         # if the user requested to resubscribe, mark patient as active
         if "start" == message.lower().strip():
-            sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
-            sms_telecom_entry.period.end = None
-            pt.persist()
+            pt.subscribe()
         message_priority = self.score_message(message)
 
         return self.generate_incoming_message(
@@ -502,6 +393,6 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, cr, successes):
+    def process_cr(self, cr: CommunicationRequest, successes: list):
         status = self.convert_communicationrequest_to_communication(cr=cr)
         successes.append({'id': cr.id, 'status': status})
