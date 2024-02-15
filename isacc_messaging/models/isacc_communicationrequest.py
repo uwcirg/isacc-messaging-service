@@ -35,7 +35,7 @@ class IsaccCommunicationRequest(CommunicationRequest):
     def dispatched(self):
         return self.identifier and len([i for i in self.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0
 
-    def dispatched_message(self):
+    def dispatched_message_status(self):
             sid = ""
             status = ""
             as_of = ""
@@ -70,7 +70,7 @@ class IsaccCommunicationRequest(CommunicationRequest):
             updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=self.id, resource=self.as_json())
             return updated_cr
 
-    def create_communication_from_request(self):
+    def create_communication_from_request(self, status = "completed"):
         if self.category[0].coding[0].code == 'isacc-manually-sent-message':
             code = 'isacc-manually-sent-message'
         else:
@@ -97,6 +97,10 @@ class IsaccCommunicationRequest(CommunicationRequest):
                 }]
             }],
             "note": [n.as_json() for n in self.note] if self.note else None,
-            "status": "completed"
+            "status": status
         }
     
+    def persist(self):
+        """Persist self state to FHIR store"""
+        response = HAPI_request('PUT', 'CommunicationRequest', resource_id=self.id, resource=self.as_json())
+        return response

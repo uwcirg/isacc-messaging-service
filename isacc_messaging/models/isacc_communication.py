@@ -24,6 +24,11 @@ class IsaccCommunication(Communication):
                     if coding.code == 'isacc-manually-sent-message':
                         return True
 
+    def persist(self):
+        """Persist self state to FHIR store"""
+        response = HAPI_request('POST', 'Communication', resource=self.as_json())
+        return response
+
     @staticmethod
     def about_patient(patient):
         """Query for "outside" Communications about the patient
