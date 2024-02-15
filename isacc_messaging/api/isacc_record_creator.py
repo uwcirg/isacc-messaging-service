@@ -62,20 +62,25 @@ class IsaccRecordCreator:
 
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         patient = resolve_reference(cr.recipient[0].reference)
+        # Create a Communication attempt
+        c = cr.create_communication_from_request(status="in-progress")
+        c = Communication(c)
         try:
             if not patient.generalPractitioner:
                 practitioner=None
             else:
-                # Create a Communication attempt
-                c = cr.create_communication_from_request(status="in-progress")
-                c = Communication(c)
-                c.persist()
 
                 practitioner = resolve_reference(patient.generalPractitioner[0].reference)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
+            c.persist()
+            audit_entry(
+                f"Created Communication resource for the outgoing text",
+                extra={"resource": c},
+                level='debug'
+            )
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
@@ -83,9 +88,17 @@ class IsaccRecordCreator:
                 # In case of unsubcribed patient, mark as unsubscribed
                 patient.unsubcribe()
                 cr.status = "on-hold"
+                c.status = "suspended"
             else:
                 # For other causes of failed communication, mark the reason for failed request as unknown
                 cr.status = "unknown"
+                c.status = "on-hold"
+            c.persist()
+            audit_entry(
+                f"Updated Communication to status to {c.status}",
+                level='debug'
+            )
+
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
@@ -245,8 +258,9 @@ class IsaccRecordCreator:
                     patient.mark_followup_extension()
             else:
                 # Update the status of the communication to completed
-                existing_comm.status = 'completed'
-                updated_comm = existing_comm.persist()
+                comm = Communication(existing_comm)
+                comm.status = 'completed'
+                updated_comm = comm.persist()
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
                     extra={"resource": updated_comm,
