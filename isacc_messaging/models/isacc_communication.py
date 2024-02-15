@@ -26,7 +26,7 @@ class IsaccCommunication(Communication):
 
     def persist(self):
         """Persist self state to FHIR store"""
-        response = HAPI_request('POST', 'Communication', resource=self.as_json())
+        response = HAPI_request('PUT', 'Communication', resource_id=self.id, resource=self.as_json())
         return response
 
     @staticmethod

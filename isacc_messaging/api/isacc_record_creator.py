@@ -62,7 +62,7 @@ class IsaccRecordCreator:
 
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         patient = resolve_reference(cr.recipient[0].reference)
-        # Create a Communication attempt
+        # Create a new Communication attempt
         c = cr.create_communication_from_request(status="in-progress")
         c = Communication(c)
         try:
@@ -75,10 +75,10 @@ class IsaccRecordCreator:
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
-            c.persist()
+            resulting_communication = HAPI_request('POST', 'Communication', resource=c.as_json())
             audit_entry(
                 f"Created Communication resource for the outgoing text",
-                extra={"resource": c},
+                extra={"resource": resulting_communication},
                 level='debug'
             )
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
@@ -194,7 +194,7 @@ class IsaccRecordCreator:
             ]
         }
         c = Communication(m)
-        result = c.persist()
+        result = HAPI_request('POST', 'Communication', resource=c.as_json())
         audit_entry(
             f"Created Communication resource for incoming text",
             extra={"resource": result},
@@ -246,10 +246,10 @@ class IsaccRecordCreator:
                 # Callback only occurs on completed Communications
                 c = cr.create_communication_from_request(status="completed")
                 c = Communication(c)
-                new_c = c.persist()
+                result = HAPI_request('POST', 'Communication', resource=c.as_json())
                 audit_entry(
-                    f"Created Communication resource:",
-                    extra={"resource": new_c},
+                    f"Created Communication resource on Twilio callback:",
+                    extra={"resource": result},
                     level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
@@ -258,12 +258,12 @@ class IsaccRecordCreator:
             else:
                 # Update the status of the communication to completed
                 comm = Communication(existing_comm)
-                comm.status = 'completed' if message_status == 'delivered' else 'in-progress'
-                updated_comm = comm.persist()
+                comm.status = "completed"
+                result = comm.persist()
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
-                    extra={"resource": updated_comm,
-                           "new status": updated_comm.get('status'),
+                    extra={"resource": result,
+                           "new status": result.get('status'),
                            "message status": message_status},
                     level='debug'
                 )
@@ -362,13 +362,12 @@ class IsaccRecordCreator:
             except Exception as e:
                 cr.status = "unknown"
                 skipped_crs.append(cr)
-                c = cr.create_communication_from_request()
+                c = cr.create_communication_from_request(status="entered-in-error")
                 c = Communication(c)
-                c.status = "entered-in-error"
-                c.persist()
+                result = HAPI_request('POST', 'Communication', resource=c.as_json())
                 audit_entry(
-                    f"Failed to send the message, {patient} does not have phone number",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
+                    f"Failed to send the message, {patient} does not have valid telecom",
+                    extra={"resource": f"{result}", "exception": e},
                     level='exception'
                 )
                 # Display Twilio Error in a human readable form
@@ -385,13 +384,12 @@ class IsaccRecordCreator:
             if patient_unsubscribed or not patient.active:
                 if patient_unsubscribed:
                     cr.status = "on-hold"
-                    c = cr.create_communication_from_request()
+                    c = cr.create_communication_from_request(status="not-done")
                     c = Communication(c)
-                    c.status = "not-done"
-                    new_c = c.persist()
+                    result = HAPI_request('POST', 'Communication', resource=c.as_json())
                     audit_entry(
                         f"Generated Communication for unsubscribed patient",
-                        extra={"resource": f"{new_c}"},
+                        extra={"resource": f"{result}"},
                         level='debug'
                     )
                 else:
