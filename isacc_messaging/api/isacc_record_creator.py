@@ -88,11 +88,11 @@ class IsaccRecordCreator:
                 # In case of unsubcribed patient, mark as unsubscribed
                 patient.unsubcribe()
                 cr.status = "on-hold"
-                c.status = "suspended"
+                c.status = "not-done"
             else:
                 # For other causes of failed communication, mark the reason for failed request as unknown
                 cr.status = "unknown"
-                c.status = "on-hold"
+                c.status = "entered-in-error"
             c.persist()
             audit_entry(
                 f"Updated Communication to status to {c.status}",
@@ -246,7 +246,6 @@ class IsaccRecordCreator:
                 # Callback only occurs on completed Communications
                 c = cr.create_communication_from_request(status="completed")
                 c = Communication(c)
-
                 new_c = c.persist()
                 audit_entry(
                     f"Created Communication resource:",
@@ -259,7 +258,7 @@ class IsaccRecordCreator:
             else:
                 # Update the status of the communication to completed
                 comm = Communication(existing_comm)
-                comm.status = 'completed'
+                comm.status = 'completed' if message_status == 'delivered' else 'in-progress'
                 updated_comm = comm.persist()
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
@@ -361,8 +360,12 @@ class IsaccRecordCreator:
                     for telecom_entry in patient.telecom
                 )
             except Exception as e:
-                cr.status = "on-hold"
+                cr.status = "unknown"
                 skipped_crs.append(cr)
+                c = cr.create_communication_from_request()
+                c = Communication(c)
+                c.status = "entered-in-error"
+                c.persist()
                 audit_entry(
                     f"Failed to send the message, {patient} does not have phone number",
                     extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
@@ -382,6 +385,15 @@ class IsaccRecordCreator:
             if patient_unsubscribed or not patient.active:
                 if patient_unsubscribed:
                     cr.status = "on-hold"
+                    c = cr.create_communication_from_request()
+                    c = Communication(c)
+                    c.status = "not-done"
+                    new_c = c.persist()
+                    audit_entry(
+                        f"Generated Communication for unsubscribed patient",
+                        extra={"resource": f"{new_c}"},
+                        level='debug'
+                    )
                 else:
                     cr.status = "revoked"
                 if cr.occurrenceDateTime.date < now:
