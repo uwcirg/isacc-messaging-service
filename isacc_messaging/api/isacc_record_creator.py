@@ -75,15 +75,16 @@ class IsaccRecordCreator:
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
-            resulting_communication = HAPI_request('POST', 'Communication', resource=comm.as_json())
+            comm = HAPI_request('POST', 'Communication', resource=comm.as_json())
             audit_entry(
                 f"Created Communication resource for the outgoing text",
-                extra={"resource": resulting_communication},
+                extra={"resource": comm},
                 level='debug'
             )
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
 
         except TwilioRestException as ex:
+            comm = Communication(comm)
             if ex.code == 21610:
                 # In case of unsubcribed patient, mark as unsubscribed
                 patient.unsubcribe()
@@ -92,13 +93,13 @@ class IsaccRecordCreator:
                 # For other causes of failed communication, mark the reason for failed request as unknown
                 comm.status = "unknown"
                 comm.statusReason = str(ex)
+            comm.persist()
 
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
                 level='exception'
             )
-            comm.persist()
             raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
 
         if result.status != 'sent' and result.status != 'queued':
@@ -384,7 +385,12 @@ class IsaccRecordCreator:
                         extra={"resource": f"{result}"},
                         level='debug'
                     )
-                skipped_crs.append(cr)
+                else:
+                    skipped_crs.append(cr)
+                if cr.occurrenceDateTime.date < now:
+                    # Skip the messages scheduled to send if user unsubscribed
+                    skipped_crs.append(cr)
+                # Do not cancel future sms
                 continue
             try:
                 self.process_cr(cr, successes)
