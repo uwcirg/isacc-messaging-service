@@ -59,12 +59,11 @@ class IsaccRecordCreator:
     def dispatch_cr(self, cr: CommunicationRequest):
         if cr.dispatched():
             return cr.dispatched_message_status()
-
+        # Default succesfull status and statusReason 
+        status = ""
+        statusReason = ""
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         patient = resolve_reference(cr.recipient[0].reference)
-        # Create a new Communication attempt
-        c = cr.create_communication_from_request(status="in-progress")
-        comm = Communication(c)
         try:
             if not patient.generalPractitioner:
                 practitioner=None
@@ -75,32 +74,25 @@ class IsaccRecordCreator:
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
-            comm = HAPI_request('POST', 'Communication', resource=comm.as_json())
-            audit_entry(
-                f"Created Communication resource for the outgoing text",
-                extra={"resource": comm},
-                level='debug'
-            )
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
-
+            status = "in-progress"
+            statusReason = f"Twilio message dispatched (status={result.status})"
         except TwilioRestException as ex:
-            comm = Communication(comm)
             if ex.code == 21610:
                 # In case of unsubcribed patient, mark as unsubscribed
                 patient.unsubcribe()
-                comm.status = "stopped"
+                status = "stopped"
+                statusReason = "Recipient unsubscribed"
             else:
                 # For other causes of failed communication, mark the reason for failed request as unknown
-                comm.status = "unknown"
-                comm.statusReason = str(ex)
-            comm.persist()
-
+                status = "unknown"
+                statusReason = str(ex)
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
                 level='exception'
             )
-            raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
+            return status, statusReason
 
         if result.status != 'sent' and result.status != 'queued':
             audit_entry(
@@ -108,7 +100,9 @@ class IsaccRecordCreator:
                 extra={"resource": result},
                 level='error'
             )
-            raise IsaccTwilioError(f"ERROR! Message status is neither sent nor queued. It was {result.status}")
+            status = "unknown"
+            statusReason = f"ERROR! Message status is neither sent nor queued. It was {result.status}"
+            return status, statusReason
         else:
             updated_cr = cr.mark_dispatched(expanded_payload, result)
             audit_entry(
@@ -116,7 +110,7 @@ class IsaccRecordCreator:
                 extra={"resource": updated_cr},
                 level='debug'
             )
-            return f"Twilio message dispatched (status={result.status})"
+            return status, statusReason
 
     def send_twilio_sms(self, message, to_phone, from_phone=None):
         from twilio.rest import Client
@@ -346,7 +340,6 @@ class IsaccRecordCreator:
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
             patient = resolve_reference(cr.recipient[0].reference)
-
             # Happens when the patient removes their phone number completely.
             # Should not occur in production.
             try:
@@ -372,15 +365,22 @@ class IsaccRecordCreator:
                 # Do not cancel future sms
                 continue
             try:
-                self.process_cr(cr, successes)
+                comm_status, comm_statusReason = self.process_cr(cr, successes)
+                c = cr.create_communication_from_request(status=comm_status)
+                c = Communication(c)
+                HAPI_request('POST', 'Communication', resource=c.as_json())
+                audit_entry(
+                    f"Sent a message for {cr.id}. Status of Communication: {comm_status}",
+                    extra={"resource": f"CommunicationResource/{cr.id}", "feedback": comm_statusReason},
+                    level='exception'
+                )
             except Exception as e:
                 audit_entry(
                     "Failed to send the message",
                     extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
                     level='exception'
                 )
-                # Do not generate another Communication, since it is already handled
-                skipped_crs.append((cr, "aborted", e))
+                skipped_crs.append((cr, "unknown", str(e)))
 
         for cr, revoked_reason, e in skipped_crs:
             # Aborted class marking CRs that should not be send
@@ -411,5 +411,8 @@ class IsaccRecordCreator:
         return successes, errors
 
     def process_cr(self, cr: CommunicationRequest, successes: list):
-        status = self.dispatch_cr(cr=cr)
-        successes.append({'id': cr.id, 'status': status})
+        status, statusReason = self.dispatch_cr(cr=cr)
+        # In-progress status entails that sms was successfully dispatched 
+        if status == "in-progress":
+            successes.append({'id': cr.id, 'status': statusReason})
+        return status, statusReason
