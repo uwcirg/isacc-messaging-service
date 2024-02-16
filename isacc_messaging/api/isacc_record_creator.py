@@ -64,7 +64,7 @@ class IsaccRecordCreator:
         patient = resolve_reference(cr.recipient[0].reference)
         # Create a new Communication attempt
         c = cr.create_communication_from_request(status="in-progress")
-        c = Communication(c)
+        comm = Communication(c)
         try:
             if not patient.generalPractitioner:
                 practitioner=None
@@ -75,7 +75,7 @@ class IsaccRecordCreator:
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
-            resulting_communication = HAPI_request('POST', 'Communication', resource=c.as_json())
+            resulting_communication = HAPI_request('POST', 'Communication', resource=comm.as_json())
             audit_entry(
                 f"Created Communication resource for the outgoing text",
                 extra={"resource": resulting_communication},
@@ -87,23 +87,18 @@ class IsaccRecordCreator:
             if ex.code == 21610:
                 # In case of unsubcribed patient, mark as unsubscribed
                 patient.unsubcribe()
-                cr.status = "on-hold"
-                c.status = "not-done"
+                comm.status = "stopped"
             else:
                 # For other causes of failed communication, mark the reason for failed request as unknown
-                cr.status = "unknown"
-                c.status = "entered-in-error"
-            c.persist()
-            audit_entry(
-                f"Updated Communication to status to {c.status}",
-                level='debug'
-            )
+                comm.status = "unknown"
+                comm.statusReason = str(ex)
 
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
                 level='exception'
             )
+            comm.persist()
             raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
 
         if result.status != 'sent' and result.status != 'queued':
@@ -334,7 +329,6 @@ class IsaccRecordCreator:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
-            
         successes = []
         errors = []
         skipped_crs = []
@@ -356,14 +350,14 @@ class IsaccRecordCreator:
             # Should not occur in production.
             try:
                 patient_unsubscribed = any(
-                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
+                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
                     for telecom_entry in patient.telecom
                 )
             except Exception as e:
-                cr.status = "unknown"
                 skipped_crs.append(cr)
-                c = cr.create_communication_from_request(status="entered-in-error")
+                c = cr.create_communication_from_request(status="unknown")
                 c = Communication(c)
+                c.statusReason = str(e)
                 result = HAPI_request('POST', 'Communication', resource=c.as_json())
                 audit_entry(
                     f"Failed to send the message, {patient} does not have valid telecom",
@@ -378,13 +372,11 @@ class IsaccRecordCreator:
                 # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
-                cr.status = "revoked"
                 skipped_crs.append(cr)
                 continue
             if patient_unsubscribed or not patient.active:
                 if patient_unsubscribed:
-                    cr.status = "on-hold"
-                    c = cr.create_communication_from_request(status="not-done")
+                    c = cr.create_communication_from_request(status="stopped")
                     c = Communication(c)
                     result = HAPI_request('POST', 'Communication', resource=c.as_json())
                     audit_entry(
@@ -392,12 +384,7 @@ class IsaccRecordCreator:
                         extra={"resource": f"{result}"},
                         level='debug'
                     )
-                else:
-                    cr.status = "revoked"
-                if cr.occurrenceDateTime.date < now:
-                    # Skip the messages scheduled to send if user unsubscribed
-                    skipped_crs.append(cr)
-                # Do not cancel future sms
+                skipped_crs.append(cr)
                 continue
             try:
                 self.process_cr(cr, successes)
@@ -411,6 +398,7 @@ class IsaccRecordCreator:
                 errors.append({'id': cr.id, 'error': str(e)})
 
         for cr in skipped_crs:
+            cr.status = "revoked"
             HAPI_request(
                 "PUT",
                 "CommunicationRequest",

@@ -77,6 +77,7 @@ class IsaccCommunicationRequest(CommunicationRequest):
             code = "isacc-auto-sent-message"
         return {
             "resourceType": "Communication",
+            "id": str(self.id),
             "basedOn": [{"reference": f"CommunicationRequest/{self.id}"}],
             "partOf": [{"reference": f"{self.basedOn[0].reference}"}],
             "category": [{
@@ -99,7 +100,7 @@ class IsaccCommunicationRequest(CommunicationRequest):
             "note": [n.as_json() for n in self.note] if self.note else None,
             "status": status
         }
-    
+
     def persist(self):
         """Persist self state to FHIR store"""
         response = HAPI_request('PUT', 'CommunicationRequest', resource_id=self.id, resource=self.as_json())
