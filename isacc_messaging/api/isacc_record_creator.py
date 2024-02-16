@@ -355,41 +355,20 @@ class IsaccRecordCreator:
                     for telecom_entry in patient.telecom
                 )
             except Exception as e:
-                skipped_crs.append(cr)
-                c = cr.create_communication_from_request(status="unknown")
-                c = Communication(c)
-                c.statusReason = str(e)
-                result = HAPI_request('POST', 'Communication', resource=c.as_json())
-                audit_entry(
-                    f"Failed to send the message, {patient} does not have valid telecom",
-                    extra={"resource": f"{result}", "exception": e},
-                    level='exception'
-                )
-                # Display Twilio Error in a human readable form
-                errors.append({'id': cr.id, 'error': str(e)})
+                skipped_crs.append({cr, False, "No Phone Number Registered"})
                 continue
 
             if cr.occurrenceDateTime.date < cutoff:
                 # Anything older than cutoff will never be sent (#1861758)
                 # and needs a status adjustment lest it throws off other queries
                 # like next outgoing message time
-                skipped_crs.append(cr)
+                skipped_crs.append((cr, "aborted", "Past the cutoff"))
                 continue
             if patient_unsubscribed or not patient.active:
+                revoked_status = (cr, "aborted", 'Recipient is not active')
                 if patient_unsubscribed:
-                    c = cr.create_communication_from_request(status="stopped")
-                    c = Communication(c)
-                    result = HAPI_request('POST', 'Communication', resource=c.as_json())
-                    audit_entry(
-                        f"Generated Communication for unsubscribed patient",
-                        extra={"resource": f"{result}"},
-                        level='debug'
-                    )
-                else:
-                    skipped_crs.append(cr)
-                if cr.occurrenceDateTime.date < now:
-                    # Skip the messages scheduled to send if user unsubscribed
-                    skipped_crs.append(cr)
+                    revoked_status = (cr, "stopped", 'Recipient unsubscribed')
+                skipped_crs.append(revoked_status)
                 # Do not cancel future sms
                 continue
             try:
@@ -400,10 +379,20 @@ class IsaccRecordCreator:
                     extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
                     level='exception'
                 )
-                skipped_crs.append(cr)
-                errors.append({'id': cr.id, 'error': str(e)})
+                # Do not generate another Communication, since it is already handled
+                skipped_crs.append((cr, "aborted", e))
 
-        for cr in skipped_crs:
+        for cr, revoked_reason, e in skipped_crs:
+            # Aborted class marking CRs that should not be send
+            if revoked_reason != "aborted":
+                c = cr.create_communication_from_request(status=revoked_reason)
+                c = Communication(c)
+                result = HAPI_request('POST', 'Communication', resource=c.as_json())
+                audit_entry(
+                    f"Generated new Communication for a revoked CR. Reason: {e}",
+                    extra={"resource": f"{result}"},
+                    level='debug'
+                )
             cr.status = "revoked"
             HAPI_request(
                 "PUT",
@@ -411,8 +400,9 @@ class IsaccRecordCreator:
                 resource_id=cr.id,
                 resource=cr.as_json())
             audit_entry(
-                f"Skipped CommunicationRequest({cr.id}); status set to {cr.status}",
-                extra={"CommunicationRequest": cr.as_json()})
+                f"Skipped CommunicationRequest({cr.id}); status set to {cr.status} because {e}",
+                extra={"CommunicationRequest": cr.as_json(), "reason": revoked_reason, "exception": e})
+            errors.append({'id': cr.id, 'error': str(e)})
             # as that message was likely the next-outgoing for the patient,
             # update the extension used to track next-outgoing-message time
             patient = resolve_reference(cr.recipient[0].reference)
