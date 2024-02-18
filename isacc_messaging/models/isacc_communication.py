@@ -29,6 +29,12 @@ class IsaccCommunication(Communication):
         response = HAPI_request('PUT', 'Communication', resource_id=self.id, resource=self.as_json())
         return response
 
+    def change_status(self, status):
+        """Persist self state to FHIR store"""
+        self.status = status
+        response = self.persist()
+        return response
+
     @staticmethod
     def about_patient(patient):
         """Query for "outside" Communications about the patient

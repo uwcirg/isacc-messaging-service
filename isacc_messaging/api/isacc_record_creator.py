@@ -59,7 +59,6 @@ class IsaccRecordCreator:
     def dispatch_cr(self, cr: CommunicationRequest):
         if cr.dispatched():
             return cr.dispatched_message_status()
-        # Default succesfull status and statusReason 
         status = ""
         statusReason = ""
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
@@ -234,22 +233,20 @@ class IsaccRecordCreator:
             }))
             if existing_comm is None:
                 # Callback only occurs on completed Communications
-                c = cr.create_communication_from_request(status="completed")
-                c = Communication(c)
-                result = HAPI_request('POST', 'Communication', resource=c.as_json())
+                comm_json = cr.create_communication_from_request(status="completed")
+                result = HAPI_request('POST', 'Communication', resource=comm_json)
                 audit_entry(
                     f"Created Communication resource on Twilio callback:",
                     extra={"resource": result},
                     level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
-                if c.is_manual_follow_up_message():
+                if comm.is_manual_follow_up_message():
                     patient.mark_followup_extension()
             else:
                 # Update the status of the communication to completed
                 comm = Communication(existing_comm)
-                comm.status = "completed"
-                result = comm.persist()
+                comm.change_status(status="completed")
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
                     extra={"resource": result,
@@ -269,7 +266,6 @@ class IsaccRecordCreator:
 
             # maintain next outgoing and last followed up Twilio message
             # extensions after each send (now know to be complete)
-            patient.mark_next_outgoing()
             patient.mark_followup_extension()
 
     def on_twilio_message_received(self, values):
@@ -326,7 +322,6 @@ class IsaccRecordCreator:
         """
         successes = []
         errors = []
-        skipped_crs = []
 
         now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
@@ -339,80 +334,82 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            patient = resolve_reference(cr.recipient[0].reference)
-            # Happens when the patient removes their phone number completely.
-            # Should not occur in production.
-            try:
-                patient_unsubscribed = any(
-                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
-                    for telecom_entry in patient.telecom
-                )
-            except Exception as e:
-                skipped_crs.append({cr, False, "No Phone Number Registered"})
-                continue
-
-            if cr.occurrenceDateTime.date < cutoff:
-                # Anything older than cutoff will never be sent (#1861758)
-                # and needs a status adjustment lest it throws off other queries
-                # like next outgoing message time
-                skipped_crs.append((cr, "aborted", "Past the cutoff"))
-                continue
-            if patient_unsubscribed or not patient.active:
-                revoked_status = (cr, "aborted", 'Recipient is not active')
-                if patient_unsubscribed:
-                    revoked_status = (cr, "stopped", 'Recipient unsubscribed')
-                skipped_crs.append(revoked_status)
-                # Do not cancel future sms
-                continue
-            try:
-                comm_status, comm_statusReason = self.process_cr(cr, successes)
-                c = cr.create_communication_from_request(status=comm_status)
-                c = Communication(c)
-                HAPI_request('POST', 'Communication', resource=c.as_json())
-                audit_entry(
-                    f"Sent a message for {cr.id}. Status of Communication: {comm_status}",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "feedback": comm_statusReason},
-                    level='exception'
-                )
-            except Exception as e:
-                audit_entry(
-                    "Failed to send the message",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
-                    level='exception'
-                )
-                skipped_crs.append((cr, "unknown", str(e)))
-
-        for cr, revoked_reason, e in skipped_crs:
-            # Aborted class marking CRs that should not be send
-            if revoked_reason != "aborted":
-                c = cr.create_communication_from_request(status=revoked_reason)
-                c = Communication(c)
-                result = HAPI_request('POST', 'Communication', resource=c.as_json())
-                audit_entry(
-                    f"Generated new Communication for a revoked CR. Reason: {e}",
-                    extra={"resource": f"{result}"},
-                    level='debug'
-                )
-            cr.status = "revoked"
-            HAPI_request(
-                "PUT",
-                "CommunicationRequest",
-                resource_id=cr.id,
-                resource=cr.as_json())
-            audit_entry(
-                f"Skipped CommunicationRequest({cr.id}); status set to {cr.status} because {e}",
-                extra={"CommunicationRequest": cr.as_json(), "reason": revoked_reason, "exception": e})
-            errors.append({'id': cr.id, 'error': str(e)})
             # as that message was likely the next-outgoing for the patient,
             # update the extension used to track next-outgoing-message time
             patient = resolve_reference(cr.recipient[0].reference)
             patient.mark_next_outgoing()
 
+            # Do not interact with CR if the patient is inactive or sending date is past the cutoff
+            if not patient.active or cr.occurrenceDateTime.date < cutoff:
+                cr.status = "revoked"
+                cr.persist()
+                revoked_reason = ""
+                if not patient.active:
+                    revoked_reason = "Recipient is not active"
+                else:
+                    revoked_reason = "Past the cutoff"
+                cr.report_cr_status(status_reason=revoked_reason)
+                errors.append({'id': cr.id, 'error': revoked_reason})
+                continue
+
+            # Otherwise, create a communication
+            comm_json = cr.create_communication_from_request(status="in-progress")
+            updated_comm = HAPI_request('POST', 'Communication', resource=comm_json)
+            comm = Communication(updated_comm)
+            audit_entry(
+                f"Generated an {comm.status} Communication/{comm.id} for CommunicationRequest/{cr.id}",
+                extra={"resource": updated_comm},
+                level="debug"
+            )
+            # Update the CommunicationRequest as completed, since new Communication was sent
+            cr.status = "completed"
+            cr.persist()
+
+            # If patient unsubscribed, mark as stopped
+            if any(
+                telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
+                for telecom_entry in getattr(patient, 'telecom', [])
+            ):
+                comm.change_status(status="stopped")
+                errors.append({'id': cr.id, 'error': "Patient unsubscribed"})
+                audit_entry(
+                    f"Updated {comm} to {comm.status}, because patient unsubscribed",
+                    extra={"resource": comm,},
+                    level='debug'
+                )
+                continue
+
+            # Otherwise, update according to the feedback from the dispatch
+            try:
+                comm_status, comm_statusReason = self.process_cr(cr, successes)
+                comm.change_status(status=comm_status)
+                audit_entry(
+                    f"Updated status of Communication/{comm.id} to {comm_status}",
+                    extra={"resource": f"Communication/{comm.id}", "statusReason": comm_statusReason},
+                    level='debug'
+                )
+                if comm_status == "in-progress":
+                    # In-progress status entails that sms was successfully dispatched 
+                    successes.append({'id': cr.id, 'status': comm_statusReason})
+                else:
+                    # Register an error encountered when sending a message
+                    audit_entry(
+                        f"Failed to send the message for CommunicationRequest/{cr.id} because {comm_statusReason}",
+                        extra={"resource": f"Communication/{comm.id}", "statusReason": comm_status},
+                        level='exception'
+                    )
+
+            except Exception as e:
+                # Register an error when sending a message
+                comm.change_status(status="unknown")
+                audit_entry(
+                    f"Failed to send the message for CommunicationRequest/{cr.id} because {e}",
+                    extra={"resource": f"Communication/{comm.id}", "statusReason": e},
+                    level='exception'
+                )
+
         return successes, errors
 
     def process_cr(self, cr: CommunicationRequest, successes: list):
         status, statusReason = self.dispatch_cr(cr=cr)
-        # In-progress status entails that sms was successfully dispatched 
-        if status == "in-progress":
-            successes.append({'id': cr.id, 'status': statusReason})
         return status, statusReason

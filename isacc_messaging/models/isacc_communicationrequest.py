@@ -6,6 +6,7 @@ the `fhirclient.CommunicationRequest` class.
 from datetime import datetime
 from fhirclient.models.communicationrequest import CommunicationRequest
 from fhirclient.models.identifier import Identifier
+from isacc_messaging.audit import audit_entry
 
 from isacc_messaging.models.fhir import HAPI_request, first_in_bundle
 
@@ -105,3 +106,9 @@ class IsaccCommunicationRequest(CommunicationRequest):
         """Persist self state to FHIR store"""
         response = HAPI_request('PUT', 'CommunicationRequest', resource_id=self.id, resource=self.as_json())
         return response
+
+    def report_cr_status(self, status_reason):
+        audit_entry(
+            f"CommunicationRequest({self.id}) status set to {self.status} because {status_reason}",
+            extra={"CommunicationRequest": self.as_json(), "reason": status_reason}
+        )
