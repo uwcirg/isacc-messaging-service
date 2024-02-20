@@ -5,6 +5,8 @@ Captures common methods needed by ISACC for Patients, by specializing the `fhirc
 from fhirclient.models.extension import Extension
 from fhirclient.models.patient import Patient
 import logging
+from datetime import datetime
+from fhirclient.models.careplan import CarePlan
 
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.isacc_communication import IsaccCommunication as Communication
@@ -13,7 +15,13 @@ from isacc_messaging.models.isacc_fhirdate import (
     DEEP_PAST,
     IsaccFHIRDate as FHIRDate,
 )
-from isacc_messaging.models.fhir import HAPI_request, IsaccFhirException, next_in_bundle
+from isacc_messaging.models.fhir import (
+    HAPI_request,
+    first_in_bundle,
+    next_in_bundle,
+    resolve_reference,
+    IsaccFhirException,
+)
 
 # URLs for patient extensions
 LAST_UNFOLLOWEDUP_URL = "http://isacc.app/time-of-last-unfollowedup-message"
@@ -32,10 +40,29 @@ class IsaccPatient(Patient):
     def active_patients():
         """Execute query for active patients
 
+        NB, returns only patients with active set to true
+        """
+        response = HAPI_request('GET', 'Patient', params={
+            "active": "true"
+        })
+        return response
+
+    @staticmethod
+    def all_patients():
+        """Execute query for all patients
+
         NB, until status is set on all patients, queries for
         any status/active value will skip those without a value.
         """
         response = HAPI_request('GET', 'Patient')
+        return response
+
+    @staticmethod
+    def get_patient_by_id(id):
+        """Execute query for all types of patients
+        to return a patient with the specified id.
+        """
+        response = HAPI_request('GET', 'Patient', resource_id=id)
         return response
 
     def get_phone_number(self) -> str:
@@ -44,6 +71,61 @@ class IsaccPatient(Patient):
                 if t.system == 'sms':
                     return t.value
         raise IsaccFhirException(f"Error: {self} doesn't have an sms contact point on file")
+
+    def get_careplan(self) -> CarePlan:
+        result = HAPI_request(
+            'GET', 'CarePlan',
+            params={
+                "subject": f"Patient/{self.id}",
+                "category": "isacc-message-plan",
+                "status": "active",
+                "_sort": "-_lastUpdated"})
+
+        result = first_in_bundle(result)
+        if result is not None:
+            return CarePlan(result)
+
+    def get_care_team_emails(self) -> list:
+        emails = set()  # make sure to return unique values
+        care_plan = self.get_careplan()
+        if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
+            if len(care_plan.careTeam) > 1:
+                audit_entry(
+                    "patient has more than one care team",
+                    extra={"Patient": self.id},
+                    level='warn'
+                )
+            # get the referenced CareTeam resource from the care plan
+            # please see https://www.pivotaltracker.com/story/show/185407795
+            # carePlan.careTeam now includes those that follow the patient
+            care_team = resolve_reference(care_plan.careTeam[0].reference)
+            if care_team and care_team.participant:
+                # format of participants: [{member: {reference: Practitioner/1}}]
+                for participant in care_team.participant:
+                    gp = resolve_reference(participant.member.reference)
+                    if gp.resource_type != 'Practitioner':
+                        continue
+                    for t in gp.telecom:
+                        if t.system == 'email':
+                            emails.add(t.value)
+
+        if not emails:
+            audit_entry(
+                "no practitioner email to notify",
+                extra={"Patient": self.id},
+                level='warn'
+            )
+        return list(emails)
+
+    def subscribe(self):
+        sms_telecom_entry = next((entry for entry in self.telecom if entry.system.lower() == 'sms'))
+        sms_telecom_entry.period.end = None
+        self.persist()
+    
+    def unsubcribe(self):
+        sms_telecom_entry = next((entry for entry in self.telecom if entry.system.lower() == 'sms'))
+        sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+        self.persist()
 
     def get_extension(self, url, attribute):
         """Get current value for extension of given url, or None if not found

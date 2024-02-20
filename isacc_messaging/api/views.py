@@ -1,10 +1,13 @@
+from functools import wraps
 import click
 import logging
-
+from datetime import datetime
 from flask import Blueprint, jsonify, request
+from flask import current_app
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
+from twilio.request_validator import RequestValidator
 
 base_blueprint = Blueprint('base', __name__, cli_group=None)
 
@@ -94,13 +97,42 @@ def message_status_update():
     )
 
     record_creator = IsaccRecordCreator()
-    result = record_creator.on_twilio_message_status_update(request.values)
-    if result is not None:
-        return result, 500
+    try:
+        record_creator.on_twilio_message_status_update(request.values)
+    except Exception as ex:
+        audit_entry(
+            f"on_twilio_message_status_update generated error {ex}",
+            level='error'
+        )
+        return ex, 200
     return '', 204
 
 
+def validate_twilio_request(f):
+    """Validates that incoming requests genuinely originated from Twilio"""
+    @wraps(f)
+    def twilio_validation_decorated(*args, **kwargs):
+        validator = RequestValidator(current_app.config.get('TWILIO_AUTH_TOKEN'))
+        # Validate the request is from Twilio using its
+        # URL, POST data, and X-TWILIO-SIGNATURE header
+        request_valid = validator.validate(
+            request.url,
+            request.form,
+            request.headers.get('X-TWILIO-SIGNATURE', ''))
+
+        if not request_valid:
+            audit_entry(
+                f"sms request not from Twilio",
+                extra={'request.values': dict(request.values)},
+                level='error'
+            )
+            return '', 403
+        return f(*args, **kwargs)
+    return twilio_validation_decorated
+
+
 @base_blueprint.route("/sms", methods=['GET','POST'])
+@validate_twilio_request
 def incoming_sms():
     audit_entry(
         f"Call to /sms webhook",
@@ -111,6 +143,7 @@ def incoming_sms():
         record_creator = IsaccRecordCreator()
         result = record_creator.on_twilio_message_received(request.values)
     except Exception as e:
+        # Unexpected error
         import traceback, sys
         exc = sys.exc_info()[0]
         stack = traceback.extract_stack()
@@ -121,16 +154,20 @@ def incoming_sms():
         audit_entry(
             f"on_twilio_message_received generated: {stackstr}",
             level="error")
-        return stackstr, 500
+        return stackstr, 200
     if result is not None:
+        # Occurs when message is incoming from unknown phone 
+        # or request is coming from a subscribed phone number, but 
+        # internal logic renders it invalid
         audit_entry(
             f"on_twilio_message_received generated error {result}",
             level='error')
-        return result, 500
+        return result, 200
     return '', 204
 
 
 @base_blueprint.route("/sms-handler", methods=['GET','POST'])
+@validate_twilio_request
 def incoming_sms_handler():
     audit_entry(
         f"Received call to /sms-handler webhook (not desired)",
@@ -195,6 +232,11 @@ def send_system_emails(category, dry_run, include_test_patients):
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_patient_extensions(dry_run):
     """Iterate through active patients, update any stale/missing extensions"""
+    # this was a 1 and done migration method.  disable for now
+    raise click.ClickException(
+        "DISABLED: unsafe to run as this will now undo any user marked "
+        "read messages via "
+        "https://github.com/uwcirg/isacc-messaging-client-sof/pull/85")
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
@@ -202,3 +244,61 @@ def update_patient_extensions(dry_run):
         patient = Patient(json_patient)
         patient.mark_next_outgoing(persist_on_change=not dry_run)
         patient.mark_followup_extension(persist_on_change=not dry_run)
+
+
+@base_blueprint.cli.command("maintenance-reinstate-all-patients")
+def update_patient_active():
+    """Iterate through all patients, activate all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    all_patients = Patient.all_patients()
+    for json_patient in next_in_bundle(all_patients):
+        patient = Patient(json_patient)
+        patient.active = True
+        patient.persist()
+        audit_entry(
+            f"Patient {patient.id} active set to true",
+            level='info'
+        )
+
+
+@base_blueprint.cli.command("maintenance-add-telecom-period-start-all-patients")
+def update_patient_telecom():
+    """Iterate through patients, add telecom start period to all of them"""
+    from isacc_messaging.models.fhir import next_in_bundle
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    import fhirclient.models.period as period
+    from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
+    patients_without_telecom_period = Patient.all_patients()
+    new_period = period.Period()
+    # Get the current time in UTC
+    current_time = datetime.utcnow()
+    # Format the current time as per the required format
+    formatted_time = current_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    new_period.start = FHIRDate(formatted_time)
+    for json_patient in next_in_bundle(patients_without_telecom_period):
+        patient = Patient(json_patient)
+        if patient.telecom:
+            for telecom_entry in patient.telecom:
+                if telecom_entry.system.lower() == "sms" and not telecom_entry.period:
+                    telecom_entry.period = new_period
+                    patient.persist()
+                    audit_entry(
+                        f"Patient {patient.id} active telecom period set to start now",
+                        level='info'
+                    )
+
+
+@base_blueprint.cli.command("deactivate_patient")
+@click.argument('patient_id')
+def deactivate_patient(patient_id):
+    """Set the active parameter to false based on provided patient id"""
+    from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
+    json_patient = Patient.get_patient_by_id(patient_id)
+    patient = Patient(json_patient)
+    patient.active = False
+    patient.persist()
+    audit_entry(
+        f"Patient {patient_id} active set to false",
+        level='info'
+    )
