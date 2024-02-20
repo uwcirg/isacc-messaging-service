@@ -367,6 +367,8 @@ class IsaccRecordCreator:
                 telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
                 for telecom_entry in getattr(patient, 'telecom', [])
             ):
+                cr.status = "revoked"
+                cr.persist()
                 stopped_comm = comm.change_status(status="stopped")
                 errors.append({'id': cr.id, 'error': "Patient unsubscribed"})
                 audit_entry(
@@ -378,6 +380,8 @@ class IsaccRecordCreator:
 
             # Otherwise, update according to the feedback from the dispatch
             try:
+                cr.status = "completed"
+                cr.persist()
                 comm_status, comm_statusReason = self.process_cr(cr, successes)
                 dispatched_comm = comm.change_status(status=comm_status)
                 audit_entry(
@@ -398,6 +402,8 @@ class IsaccRecordCreator:
                     errors.append({'id': cr.id, 'error': comm_statusReason})
 
             except Exception as e:
+                cr.status = "revoked"
+                cr.persist()
                 # Register an error when sending a message
                 comm.change_status(status="unknown")
                 audit_entry(
