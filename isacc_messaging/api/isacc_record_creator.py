@@ -1,10 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import re
 from typing import List, Tuple
 
-from fhirclient.models.careplan import CarePlan
 from fhirclient.models.communication import Communication
-from fhirclient.models.identifier import Identifier
 from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
@@ -58,77 +56,42 @@ class IsaccRecordCreator:
     def __init__(self):
         pass
 
-    def __create_communication_from_request(self, cr):
-        if cr.category[0].coding[0].code == 'isacc-manually-sent-message':
-            code = 'isacc-manually-sent-message'
-        else:
-            code = "isacc-auto-sent-message"
-        return {
-            "resourceType": "Communication",
-            "basedOn": [{"reference": f"CommunicationRequest/{cr.id}"}],
-            "partOf": [{"reference": f"{cr.basedOn[0].reference}"}],
-            "category": [{
-                "coding": [{
-                    "system": "https://isacc.app/CodeSystem/communication-type",
-                    "code": code
-                }]
-            }],
-
-            "payload": [p.as_json() for p in cr.payload],
-            "sent": datetime.now().astimezone().isoformat(),
-            "sender": cr.sender.as_json() if cr.sender else None,
-            "recipient": [r.as_json() for r in cr.recipient],
-            "medium": [{
-                "coding": [{
-                    "system": "http://terminology.hl7.org/ValueSet/v3-ParticipationMode",
-                    "code": "SMSWRIT"
-                }]
-            }],
-            "note": [n.as_json() for n in cr.note] if cr.note else None,
-            "status": "completed"
-        }
-
-    def convert_communicationrequest_to_communication(self, cr):
-        if cr.identifier and len([i for i in cr.identifier if i.system == "http://isacc.app/twilio-message-sid"]) > 0:
-            sid = ""
-            status = ""
-            as_of = ""
-            for i in cr.identifier:
-                for e in i.extension:
-                    if e.url == "http://isacc.app/twilio-message-status":
-                        status = e.valueCode
-                    if e.url == "http://isacc.app/twilio-message-status-updated":
-                        as_of = e.valueDateTime.isostring
-                if i.system == "http://isacc.app/twilio-message-sid":
-                    sid = i.value
-            return f"Twilio message (sid: {sid}, CR.id: {cr.id}) was previously dispatched. Last known status: {status} (as of {as_of})"
-
+    def dispatch_cr(self, cr: CommunicationRequest):
+        if cr.dispatched():
+            return cr.dispatched_message_status()
+        status = ""
+        statusReason = ""
         target_phone = resolve_reference(cr.recipient[0].reference).get_phone_number()
         patient = resolve_reference(cr.recipient[0].reference)
         try:
             if not patient.generalPractitioner:
                 practitioner=None
             else:
+
                 practitioner = resolve_reference(patient.generalPractitioner[0].reference)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
                 patient=patient,
                 practitioner=practitioner)
             result = self.send_twilio_sms(message=expanded_payload, to_phone=target_phone)
-
+            status = "in-progress"
+            statusReason = f"Twilio message dispatched (status={result.status})"
         except TwilioRestException as ex:
-            # In case of unsubcribed patient, mark as unsubscribed
             if ex.code == 21610:
-                sms_telecom_entry = next((entry for entry in patient.telecom if entry.system.lower() == 'sms'))
-                sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
-                patient.persist()
-
+                # In case of unsubcribed patient, mark as unsubscribed
+                patient.unsubcribe()
+                status = "stopped"
+                statusReason = "Recipient unsubscribed"
+            else:
+                # For other causes of failed communication, mark the reason for failed request as unknown
+                status = "unknown"
+                statusReason = str(ex)
             audit_entry(
                 "Twilio exception",
                 extra={"resource": f"CommunicationResource/{cr.id}", "exception": ex},
                 level='exception'
             )
-            raise IsaccTwilioError(f"ERROR! {ex} raised attempting to send SMS")
+            return status, statusReason
 
         if result.status != 'sent' and result.status != 'queued':
             audit_entry(
@@ -136,33 +99,17 @@ class IsaccRecordCreator:
                 extra={"resource": result},
                 level='error'
             )
-            raise IsaccTwilioError(f"ERROR! Message status is neither sent nor queued. It was {result.status}")
+            status = "unknown"
+            statusReason = f"ERROR! Message status is neither sent nor queued. It was {result.status}"
+            return status, statusReason
         else:
-            cr.payload[0].contentString = expanded_payload
-            if not cr.identifier:
-                cr.identifier = []
-            cr.identifier.append(Identifier({
-                "system": "http://isacc.app/twilio-message-sid",
-                "value": result.sid,
-                "extension": [
-                    {
-                        "url": "http://isacc.app/twilio-message-status",
-                        "valueCode": result.status
-                    },
-                    {
-                        "url": "http://isacc.app/twilio-message-status-updated",
-                        "valueDateTime": datetime.now().astimezone().isoformat()
-                    },
-                ]
-            }))
-            updated_cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
+            updated_cr = cr.mark_dispatched(expanded_payload, result)
             audit_entry(
                 f"Updated CommunicationRequest with Twilio SID:",
                 extra={"resource": updated_cr},
                 level='debug'
             )
-
-            return f"Twilio message dispatched (status={result.status})"
+            return status, statusReason
 
     def send_twilio_sms(self, message, to_phone, from_phone=None):
         from twilio.rest import Client
@@ -189,51 +136,6 @@ class IsaccRecordCreator:
         )
         return message
 
-    def get_careplan(self, patient: Patient) -> CarePlan:
-        result = HAPI_request(
-            'GET', 'CarePlan',
-            params={
-                "subject": f"Patient/{patient.id}",
-                "category": "isacc-message-plan",
-                "status": "active",
-                "_sort": "-_lastUpdated"})
-
-        result = first_in_bundle(result)
-        if result is not None:
-            return CarePlan(result)
-
-    def get_care_team_emails(self, patient: Patient) -> list:
-        emails = set()  # make sure to return unique values
-        care_plan = self.get_careplan(patient)
-        if care_plan and care_plan.careTeam and len(care_plan.careTeam) > 0:
-            if len(care_plan.careTeam) > 1:
-                audit_entry(
-                    "patient has more than one care team",
-                    extra={"Patient": patient.id},
-                    level='warn'
-                )
-            # get the referenced CareTeam resource from the care plan
-            # please see https://www.pivotaltracker.com/story/show/185407795
-            # carePlan.careTeam now includes those that follow the patient
-            care_team = resolve_reference(care_plan.careTeam[0].reference)
-            if care_team and care_team.participant:
-                # format of participants: [{member: {reference: Practitioner/1}}]
-                for participant in care_team.participant:
-                    gp = resolve_reference(participant.member.reference)
-                    if gp.resource_type != 'Practitioner':
-                        continue
-                    for t in gp.telecom:
-                        if t.system == 'email':
-                            emails.add(t.value)
-
-        if not emails:
-            audit_entry(
-                "no practitioner email to notify",
-                extra={"Patient": patient.id},
-                level='warn'
-            )
-        return list(emails)
-
     def generate_incoming_message(self, message, time: datetime = None, patient: Patient=None, priority=None, themes=None,
                                   twilio_sid=None):
         if priority and priority not in ("routine", "urgent", "stat"):
@@ -245,7 +147,7 @@ class IsaccRecordCreator:
         if patient is None:
             raise ValueError("Missing active patient")
 
-        care_plan = self.get_careplan(patient)
+        care_plan = patient.get_careplan()
 
         if not care_plan:
             error = "No CarePlan for this patient:"
@@ -289,9 +191,10 @@ class IsaccRecordCreator:
         )
         # look for participating practitioners in patient's care team
         # which always includes the generalPractitioners
-        notify_emails = self.get_care_team_emails(patient)
-        send_message_received_notification(notify_emails, patient)
-        patient.mark_followup_extension()
+        notify_emails = patient.get_care_team_emails()
+        if len(notify_emails) > 0:
+            send_message_received_notification(notify_emails, patient)
+            patient.mark_followup_extension()
 
     def on_twilio_message_status_update(self, values):
         message_sid = values.get('MessageSid', None)
@@ -329,45 +232,46 @@ class IsaccRecordCreator:
                 'based-on': f"CommunicationRequest/{cr.id}"
             }))
             if existing_comm is None:
-                c = self.__create_communication_from_request(cr)
-                c = Communication(c)
-
-                new_c = HAPI_request('POST', 'Communication', resource=c.as_json())
+                # Callback only occurs on completed Communications
+                comm_json = cr.create_communication_from_request(status="completed")
+                comm = Communication(comm_json)
+                new_comm = HAPI_request('POST', 'Communication', resource=comm.as_json())
                 audit_entry(
-                    f"Created Communication resource:",
-                    extra={"resource": new_c},
+                    f"Created Communication resource on Twilio callback:",
+                    extra={"resource": new_comm},
                     level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
-                if c.is_manual_follow_up_message():
+                if comm.is_manual_follow_up_message():
                     patient.mark_followup_extension()
             else:
+                # Update the status of the communication to completed
+                comm = Communication(existing_comm)
+                comm.change_status(status="completed")
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
-                    extra={"resource": existing_comm,
-                           "existing status": existing_comm.get('status'),
+                    extra={"resource": comm,
                            "message status": message_status},
                     level='debug'
                 )
 
             cr.status = "completed"
-            cr = HAPI_request('PUT', 'CommunicationRequest', resource_id=cr.id, resource=cr.as_json())
+            updated_cr = cr.persist()
 
             audit_entry(
-                f"Updated CommunicationRequest due to twilio status update:",
-                extra={"resource": cr},
+                f"Updated CommunicationRequest and Communication due to twilio status update:",
+                extra={"resource": f"CR: {updated_cr} \n Comm: {existing_comm}"},
                 level='debug'
             )
 
             # maintain next outgoing and last followed up Twilio message
             # extensions after each send (now know to be complete)
-            patient.mark_next_outgoing()
             patient.mark_followup_extension()
 
     def on_twilio_message_received(self, values):
         pt = HAPI_request('GET', 'Patient', params={
-            'telecom': values.get('From', "+1").replace("+1", ""),
-            'active': 'true',
+            "telecom": values.get("From", "+1").replace("+1", ""),
+            "active": "true",
         })
         pt = first_in_bundle(pt)
         if not pt:
@@ -384,9 +288,7 @@ class IsaccRecordCreator:
         message = values.get("Body")
         # if the user requested to resubscribe, mark patient as active
         if "start" == message.lower().strip():
-            sms_telecom_entry = next((entry for entry in pt.telecom if entry.system.lower() == 'sms'))
-            sms_telecom_entry.period.end = None
-            pt.persist()
+            pt.subscribe()
         message_priority = self.score_message(message)
 
         return self.generate_incoming_message(
@@ -418,10 +320,8 @@ class IsaccRecordCreator:
         """
         For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
         """
-            
         successes = []
         errors = []
-        skipped_crs = []
 
         now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
@@ -434,66 +334,86 @@ class IsaccRecordCreator:
 
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            patient = resolve_reference(cr.recipient[0].reference)
-
-            # Happens when the patient removes their phone number completely.
-            # Should not occur in production.
-            try:
-                patient_unsubscribed = any(
-                    telecom_entry.system.lower() == 'sms' and telecom_entry.period.end 
-                    for telecom_entry in patient.telecom
-                )
-            except Exception as e:
-                skipped_crs.append(cr)
-                audit_entry(
-                    f"Failed to send the message, {patient} does not have phone number",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
-                    level='exception'
-                )
-                # Display Twilio Error in a human readable form
-                errors.append({'id': cr.id, 'error': str(e)})
-                continue
-
-            if cr.occurrenceDateTime.date < cutoff:
-                # Anything older than cutoff will never be sent (#1861758)
-                # and needs a status adjustment lest it throws off other queries
-                # like next outgoing message time
-                skipped_crs.append(cr)
-                continue
-            if patient_unsubscribed or not patient.active:
-                if cr.occurrenceDateTime.date < now:
-                    # Skip the messages scheduled to send if user unsubscribed
-                    skipped_crs.append(cr)
-                # Do not cancel future sms
-                continue
-            try:
-                self.process_cr(cr, successes)
-            except Exception as e:
-                audit_entry(
-                    "Failed to send the message",
-                    extra={"resource": f"CommunicationResource/{cr.id}", "exception": e},
-                    level='exception'
-                )
-                # Display Twilio Error in a human readable form
-                errors.append({'id': cr.id, 'error': str(e)})
-
-        for cr in skipped_crs:
-            cr.status = "revoked"
-            HAPI_request(
-                "PUT",
-                "CommunicationRequest",
-                resource_id=cr.id,
-                resource=cr.as_json())
-            audit_entry(
-                f"Skipped CommunicationRequest({cr.id}); status set to revoked",
-                extra={"CommunicationRequest": cr.as_json()})
             # as that message was likely the next-outgoing for the patient,
             # update the extension used to track next-outgoing-message time
             patient = resolve_reference(cr.recipient[0].reference)
             patient.mark_next_outgoing()
 
+            # Do not interact with CR if the patient is inactive or sending date is past the cutoff
+            if not patient.active or cr.occurrenceDateTime.date < cutoff:
+                cr.status = "revoked"
+                cr.persist()
+                revoked_reason = ""
+                if not patient.active:
+                    revoked_reason = "Recipient is not active"
+                else:
+                    revoked_reason = "Past the cutoff"
+                cr.report_cr_status(status_reason=revoked_reason)
+                errors.append({'id': cr.id, 'error': revoked_reason})
+                continue
+
+            # Otherwise, create a communication
+            comm_json = cr.create_communication_from_request(status="in-progress")
+            updated_comm = HAPI_request('POST', 'Communication', resource=comm_json)
+            comm = Communication(updated_comm)
+            audit_entry(
+                f"Generated an {comm.status} Communication/{comm.id} for CommunicationRequest/{cr.id}",
+                extra={"new Communication": updated_comm},
+                level="debug"
+            )
+
+            # If patient unsubscribed, mark as stopped
+            if any(
+                telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
+                for telecom_entry in getattr(patient, 'telecom', [])
+            ):
+                cr.status = "revoked"
+                cr.persist()
+                stopped_comm = comm.change_status(status="stopped")
+                errors.append({'id': cr.id, 'error': "Patient unsubscribed"})
+                audit_entry(
+                    f"Updated {comm} to {comm.status}, because patient unsubscribed",
+                    extra={"Updated Communication": stopped_comm},
+                    level='debug'
+                )
+                continue
+
+            # Otherwise, update according to the feedback from the dispatch
+            try:
+                cr.status = "completed"
+                cr.persist()
+                comm_status, comm_statusReason = self.process_cr(cr, successes)
+                dispatched_comm = comm.change_status(status=comm_status)
+                audit_entry(
+                    f"Updated status of Communication/{comm.id} to {comm_status}",
+                    extra={"dispatched Communication": dispatched_comm, "statusReason": comm_statusReason},
+                    level='debug'
+                )
+                if comm_status == "in-progress":
+                    # In-progress status entails that sms was successfully dispatched
+                    successes.append({'id': cr.id, 'status': comm_statusReason})
+                else:
+                    # Register an error encountered when sending a message
+                    audit_entry(
+                        f"Failed to send the message for CommunicationRequest/{cr.id} because {comm_statusReason}",
+                        extra={"Dispatched Communication": dispatched_comm, "statusReason": comm_status},
+                        level='exception'
+                    )
+                    errors.append({'id': cr.id, 'error': comm_statusReason})
+
+            except Exception as e:
+                cr.status = "revoked"
+                cr.persist()
+                # Register an error when sending a message
+                comm.change_status(status="unknown")
+                audit_entry(
+                    f"Failed to send the message for CommunicationRequest/{cr.id} because {e}",
+                    extra={"resource": f"Communication/{comm.id}", "statusReason": e},
+                    level='exception'
+                )
+
         return successes, errors
 
-    def process_cr(self, cr, successes):
-        status = self.convert_communicationrequest_to_communication(cr=cr)
-        successes.append({'id': cr.id, 'status': status})
+    def process_cr(self, cr: CommunicationRequest, successes: list):
+        status, statusReason = self.dispatch_cr(cr=cr)
+        return status, statusReason
