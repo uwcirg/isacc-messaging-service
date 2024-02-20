@@ -358,23 +358,20 @@ class IsaccRecordCreator:
             comm = Communication(updated_comm)
             audit_entry(
                 f"Generated an {comm.status} Communication/{comm.id} for CommunicationRequest/{cr.id}",
-                extra={"resource": updated_comm},
+                extra={"new Communication": updated_comm},
                 level="debug"
             )
-            # Update the CommunicationRequest as completed, since new Communication was sent
-            cr.status = "completed"
-            cr.persist()
 
             # If patient unsubscribed, mark as stopped
             if any(
                 telecom_entry.system.lower() == 'sms' and telecom_entry.period.end
                 for telecom_entry in getattr(patient, 'telecom', [])
             ):
-                comm.change_status(status="stopped")
+                stopped_comm = comm.change_status(status="stopped")
                 errors.append({'id': cr.id, 'error': "Patient unsubscribed"})
                 audit_entry(
                     f"Updated {comm} to {comm.status}, because patient unsubscribed",
-                    extra={"resource": comm,},
+                    extra={"Updated Communication": stopped_comm},
                     level='debug'
                 )
                 continue
@@ -382,10 +379,10 @@ class IsaccRecordCreator:
             # Otherwise, update according to the feedback from the dispatch
             try:
                 comm_status, comm_statusReason = self.process_cr(cr, successes)
-                comm.change_status(status=comm_status)
+                dispatched_comm = comm.change_status(status=comm_status)
                 audit_entry(
                     f"Updated status of Communication/{comm.id} to {comm_status}",
-                    extra={"resource": f"Communication/{comm.id}", "statusReason": comm_statusReason},
+                    extra={"dispatched Communication": dispatched_comm, "statusReason": comm_statusReason},
                     level='debug'
                 )
                 if comm_status == "in-progress":
@@ -395,9 +392,10 @@ class IsaccRecordCreator:
                     # Register an error encountered when sending a message
                     audit_entry(
                         f"Failed to send the message for CommunicationRequest/{cr.id} because {comm_statusReason}",
-                        extra={"resource": f"Communication/{comm.id}", "statusReason": comm_status},
+                        extra={"Dispatched Communication": dispatched_comm, "statusReason": comm_status},
                         level='exception'
                     )
+                    errors.append({'id': cr.id, 'error': comm_statusReason})
 
             except Exception as e:
                 # Register an error when sending a message
