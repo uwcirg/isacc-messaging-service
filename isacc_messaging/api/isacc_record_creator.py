@@ -234,10 +234,11 @@ class IsaccRecordCreator:
             if existing_comm is None:
                 # Callback only occurs on completed Communications
                 comm_json = cr.create_communication_from_request(status="completed")
-                result = HAPI_request('POST', 'Communication', resource=comm_json)
+                comm = Communication(comm_json)
+                new_comm = HAPI_request('POST', 'Communication', resource=comm.as_json())
                 audit_entry(
                     f"Created Communication resource on Twilio callback:",
-                    extra={"resource": result},
+                    extra={"resource": new_comm},
                     level='debug'
                 )
                 # if this was a manual message, mark patient as having been followed up with
@@ -249,8 +250,7 @@ class IsaccRecordCreator:
                 comm.change_status(status="completed")
                 audit_entry(
                     f"Received /MessageStatus callback with status {message_status} on existing Communication resource",
-                    extra={"resource": result,
-                           "new status": result.get('status'),
+                    extra={"resource": comm,
                            "message status": message_status},
                     level='debug'
                 )
@@ -389,7 +389,7 @@ class IsaccRecordCreator:
                     level='debug'
                 )
                 if comm_status == "in-progress":
-                    # In-progress status entails that sms was successfully dispatched 
+                    # In-progress status entails that sms was successfully dispatched
                     successes.append({'id': cr.id, 'status': comm_statusReason})
                 else:
                     # Register an error encountered when sending a message
