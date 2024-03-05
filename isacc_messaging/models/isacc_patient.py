@@ -122,7 +122,7 @@ class IsaccPatient(Patient):
         sms_telecom_entry.period.end = None
         self.persist()
     
-    def unsubcribe(self):
+    def unsubscribe(self):
         sms_telecom_entry = next((entry for entry in self.telecom if entry.system.lower() == 'sms'))
         sms_telecom_entry.period.end = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
         self.persist()
