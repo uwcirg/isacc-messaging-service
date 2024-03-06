@@ -78,8 +78,8 @@ class IsaccRecordCreator:
             statusReason = f"Twilio message dispatched (status={result.status})"
         except TwilioRestException as ex:
             if ex.code == 21610:
-                # In case of unsubcribed patient, mark as unsubscribed
-                patient.unsubcribe()
+                # In case of unsubscribed patient, mark as unsubscribed
+                patient.unsubscribe()
                 status = "stopped"
                 statusReason = "Recipient unsubscribed"
             else:
@@ -286,9 +286,13 @@ class IsaccRecordCreator:
         pt = Patient(pt)
 
         message = values.get("Body")
-        # if the user requested to resubscribe, mark patient as active
-        if "start" == message.lower().strip():
+        if message.lower().strip() == "stop":
+            # if the user requested to unsubscribe, mark patient as inactive
+            pt.unsubscribe()
+        elif message.lower().strip() == "start":
+            # if the user requested to resubscribe, mark patient as active
             pt.subscribe()
+
         message_priority = self.score_message(message)
 
         return self.generate_incoming_message(
