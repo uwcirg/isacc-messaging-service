@@ -2,6 +2,7 @@ from functools import wraps
 import click
 import logging
 from datetime import datetime
+import os
 from flask import Blueprint, jsonify, request
 from flask import current_app
 
@@ -302,3 +303,37 @@ def deactivate_patient(patient_id):
         f"Patient {patient_id} active set to false",
         level='info'
     )
+
+@base_blueprint.cli.command("naive_update_migration")
+def run_naive_migrations():
+    migrations_dir = os.path.join(current_app.root_path, "migrations")
+    migration_files = sorted(os.listdir(migrations_dir))
+
+    # Find the most recent migration number
+    most_recent_migration = 0
+    for filename in migration_files:
+        migration_number = int(filename.split("_")[0])
+        if migration_number > most_recent_migration:
+            most_recent_migration = migration_number
+
+    # Find the latest applied migration number from 
+    # the proper FHIR resource storing the latest migration number, 
+    # which is updated with every run, akin to how the commands update
+    # the meta tag on the patient when ran
+    latest_applied_migration = get_latest_applied_migration()
+
+    # Determine which migrations need to be run
+    migrations_to_run = [filename for filename in migration_files if int(filename.split("_")[0]) > latest_applied_migration]
+
+    # Run each migration script
+    for filename in migrations_to_run:
+        migration_path = os.path.join(migrations_dir, filename)
+        with open(migration_path, "r") as migration_file:
+            migration_code = migration_file.read()
+            exec(migration_code)
+
+
+def get_latest_applied_migration():
+    # TODO: add logic to retrieve an FHIR element with latest applied
+    # migration with a HAPI call, such as Basic
+    return 0
