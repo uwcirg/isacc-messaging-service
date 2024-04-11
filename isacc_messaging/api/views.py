@@ -331,9 +331,21 @@ def run_naive_migrations():
         with open(migration_path, "r") as migration_file:
             migration_code = migration_file.read()
             exec(migration_code)
+    
+    # Find the latest applied migration number from 
+    # the proper FHIR resource storing the latest migration number, 
+    # which is updated with every run, akin to how the commands update
+    # the meta tag on the patient when ran
+    update_latest_applied_migration(latest_applied_migration, most_recent_migration)
 
 
 def get_latest_applied_migration():
     # TODO: add logic to retrieve an FHIR element with latest applied
     # migration with a HAPI call, such as Basic
+    return 0
+
+def update_latest_applied_migration(latest_applied_migration, most_recent_migration):
+    # TODO: add logic to do a HAPI call according to the
+    # given resource's id and then update its content
+    # to most_recent_migration number
     return 0
