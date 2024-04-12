@@ -2,16 +2,17 @@ from functools import wraps
 import click
 import logging
 from datetime import datetime
-import os
 from flask import Blueprint, jsonify, request
 from flask import current_app
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
+from migrations.migration import Migration
 from twilio.request_validator import RequestValidator
 
 base_blueprint = Blueprint('base', __name__, cli_group=None)
 
+migration_manager = Migration(current_app.root_path)
 
 @base_blueprint.route('/')
 def root():
@@ -303,3 +304,22 @@ def deactivate_patient(patient_id):
         f"Patient {patient_id} active set to false",
         level='info'
     )
+
+
+@base_blueprint.cli.command("migrate")
+@click.argument('migration_name')
+def migrate(migration_name):
+    # Generate a new migration script
+    migration_manager.generate_migration_script(migration_name)
+
+
+@base_blueprint.cli.command("upgrade")
+def upgrade():
+    # Run migrations to upgrade the schema
+    migration_manager.run_migrations("upgrade")
+
+
+@base_blueprint.cli.command("downgrade")
+def downgrade():
+    # Run migrations to downgrade the schema
+    migration_manager.run_migrations("downgrade")
