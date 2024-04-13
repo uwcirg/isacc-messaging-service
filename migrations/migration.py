@@ -1,10 +1,19 @@
 import os
 from typing import List
-from flask import current_app
+from datetime import datetime
+
+from isacc_messaging.audit import audit_entry
+from isacc_messaging.models.fhir import (
+    HAPI_request,
+    first_in_bundle,
+    next_in_bundle,
+    resolve_reference,
+)
+from migration_resource import MigrationManager
 
 class Migration:
-    def __init__(self, path=current_app.root_path):
-        self.migrations_dir = os.path.join(path, "versions")
+    def __init__(self):
+        self.migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
         self.latest_applied_migration = self.get_applied_migration_from_fhir()
 
     def get_migration_files(self) -> List[str]:
@@ -23,13 +32,61 @@ class Migration:
 
     def get_applied_migration_from_fhir(self) -> int:
         """Retrieve the latest applied migration number from FHIR."""
-        # TODO: Implement logic to retrieve the latest applied migration number from FHIR
-        return 0
+        # Logic to retrieve the latest applied migration number from FHIR
+        basic = HAPI_request('GET', 'Basic', params={
+            "identifier": f"http://isacc.app/twilio-message-sid|{id}"
+        })
+        basic = first_in_bundle(basic)
+
+        if basic is None:
+            self.create_new_migration_manager()
+
+            return 1
+
+        manager = MigrationManager(basic)
+        latest_applied_migration = manager.get_migration()
+
+        return latest_applied_migration
 
     def update_applied_migration_in_fhir(self, latest_applied_migration: int):
         """Update the latest applied migration number in FHIR."""
-        # TODO: add logic to update the latest applied migration number in FHIR
         self.latest_applied_migration = latest_applied_migration
+
+        # Logic to update the latest applied migration number in FHIR
+        basic = HAPI_request('GET', 'Basic', params={
+            "identifier": f"http://isacc.app/twilio-message-sid|{id}"
+        })
+        basic = first_in_bundle(basic)
+
+        if basic is None:
+            self.create_new_migration_manager(latest_applied_migration)
+
+        manager = MigrationManager(basic)
+        latest_applied_migration = manager.update_migration(latest_applied_migration)
+
+    def create_new_migration_manager(self, initial_applied_migration: int = 1):
+        """Create new FHIR resource to keep track of Migration History."""
+        self.latest_applied_migration = initial_applied_migration
+
+        message = "No Migration History for this repository. Initializing new Migration Manager"
+
+        audit_entry(
+            message,
+            level='info'
+        )
+
+        # Logic to create new Basic resource keeping track of the migration
+        if time is None:
+            time = datetime.now()
+
+        created_time = time.astimezone().isoformat()
+        m = {
+            'resourceType': 'Basic',
+            'identifier': [{"system": "http://our.migration.system", "value": system_wide_id_or_latest_applied_migration}],
+            'code': {"coding": [{ "system": "http://our.migration.system", "code": initial_applied_migration}]},
+            'created': created_time,
+        }
+        HAPI_request('POST', 'Basic', resource=m)
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
