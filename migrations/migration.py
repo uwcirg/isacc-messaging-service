@@ -9,7 +9,7 @@ from isacc_messaging.models.fhir import (
     next_in_bundle,
     resolve_reference,
 )
-from migration_resource import MigrationManager
+from migrations.migration_resource import MigrationManager
 
 class Migration:
     def __init__(self):
