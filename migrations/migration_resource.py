@@ -17,7 +17,7 @@ class MigrationManager(Basic):
         return f"{self.resource_type}/{self.id}"
 
     def get_latest_migration():
-        return 0
+        return None
 
     def persist(self):
         """Persist self state to FHIR store"""
