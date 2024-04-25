@@ -6,7 +6,6 @@ import re
 
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.fhir import (
-    HAPI_request,
     first_in_bundle,
 )
 from migrations.migration_resource import MigrationManager
