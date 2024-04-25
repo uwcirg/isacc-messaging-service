@@ -59,8 +59,14 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
         your_instance = Migration()
 
         # Call the method to test and assert the raised ValueError with the expected message
-        with pytest.raises(ValueError):
-            your_instance.build_migration_sequence()
+        with pytest.raises(ValueError) as exc_info:
+            try:
+                migration_instance.build_migration_sequence()
+            except ValueError as ex:
+                assert True
+                pass
+
+        assert str(exc_info.value) == "Cycle detected in migration sequence for migration1"
 
 def test_build_migration_sequence(migration_instance):
     migration_sequence = migration_instance.build_migration_sequence()
