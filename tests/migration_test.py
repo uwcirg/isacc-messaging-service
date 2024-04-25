@@ -16,10 +16,10 @@ def test_build_migration_sequence_empty(mock_get_previous_migration_id):
     # Mock the output of get_migration_files
     with patch.object(Migration, 'get_migration_files', return_value=[]):
         # Instantiate YourClass
-        your_instance = Migration()
+        migration_instance = Migration()
 
         # Call the method to test
-        result = your_instance.build_migration_sequence()
+        result = migration_instance.build_migration_sequence()
 
         # Assert that the result is an empty dictionary
         assert result == {}
@@ -36,10 +36,10 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         }.get
 
         # Instantiate YourClass
-        your_instance = Migration()
+        migration_instance = Migration()
 
         # Call the method to test
-        result = your_instance.build_migration_sequence()
+        result = migration_instance.build_migration_sequence()
 
         # Assert the result
         expected_result = {'migration1': None, 'migration2': 'migration1', 'migration3': 'migration2'}
@@ -56,7 +56,7 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
         }.get
 
         # Instantiate YourClass
-        your_instance = Migration()
+        migration_instance = Migration()
 
         # Call the method to test and assert the raised ValueError with the expected message
         with pytest.raises(ValueError) as exc_info:
