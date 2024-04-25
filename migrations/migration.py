@@ -12,8 +12,10 @@ from isacc_messaging.models.fhir import (
 from migrations.migration_resource import MigrationManager
 
 class Migration:
-    def __init__(self):
-        self.migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
+    def __init__(self, migrations_dir=None):
+        if migrations_dir is None:
+            migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
+        self.migrations_dir = migrations_dir
         self.migration_sequence = self.build_migration_sequence()
 
     def build_migration_sequence(self) -> dict:

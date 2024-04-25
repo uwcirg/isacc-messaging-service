@@ -34,4 +34,3 @@ class MigrationManager(Basic):
         """Returns most recent available migration"""
         current_migration = self.code["coding"][0]["code"]
         return current_migration
-
