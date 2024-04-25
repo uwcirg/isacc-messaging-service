@@ -30,7 +30,14 @@ class Migration:
 
         def dfs(node):
             if node in traversing:
-                raise ValueError(f"Cycle detected in migration sequence for {node}")
+                error_message = f"Cycle detected in migration sequence for {node}"
+                audit_entry(
+                    error_message,
+                    extra={"node": node},
+                    level='error'
+                )
+
+                raise ValueError(error_message)
             if node in visited:
                 return
             visited.add(node)
