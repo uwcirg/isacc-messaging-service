@@ -16,8 +16,17 @@ class MigrationManager(Basic):
     def __repr__(self):
         return f"{self.resource_type}/{self.id}"
 
-    def get_latest_migration():
-        return None
+    @staticmethod
+    def create_resource(resource = None):
+        """Create a new Migration Manager"""
+        response = HAPI_request('POST', 'Basic', resource=resource)
+        return response
+
+    @staticmethod
+    def get_resource(params=None):
+        """Search for the Migration Manager"""
+        response = HAPI_request('GET', 'Basic', params=params)
+        return response
 
     def persist(self):
         """Persist self state to FHIR store"""

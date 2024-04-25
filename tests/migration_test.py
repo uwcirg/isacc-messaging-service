@@ -30,9 +30,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id
         mock_get_previous_migration_id.side_effect = {
-            'migration2': 'migration1',
-            'migration3': 'migration2',
-            'migration1': None
+            'migration2.py': 'migration1',
+            'migration3.py': 'migration2',
+            'migration1.py': None
         }.get
 
         # Instantiate YourClass
@@ -51,8 +51,8 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
-            'migration2': 'migration1',
-            'migration1': 'migration2'
+            'migration2.py': 'migration1',
+            'migration1.py': 'migration2'
         }.get
 
         # Instantiate YourClass
@@ -76,13 +76,13 @@ def test_get_previous_migration_id(migration_instance):
     prev_migration_id = migration_instance.get_previous_migration_id(filename)
     assert prev_migration_id is None
 
-# def test_generate_migration_script(migration_instance):
-#     migration_name = "new_test_migration"
-#     migration_filename = migration_instance.generate_migration_script(migration_name)
-#     assert isinstance(migration_filename, str)
-#     assert migration_filename.endswith('.py')
-#     migration_path = os.path.join(migration_instance.migrations_dir, migration_filename)
-#     assert os.path.exists(migration_path)
+def test_generate_migration_script(migration_instance):
+    migration_name = "new_test_migration"
+    migration_filename = migration_instance.generate_migration_script(migration_name)
+    assert isinstance(migration_filename, str)
+    assert migration_filename.endswith('.py')
+    migration_path = os.path.join(migration_instance.migrations_dir, migration_filename)
+    assert os.path.exists(migration_path)
 
 def test_run_migrations_invalid_direction(migration_instance):
     with pytest.raises(ValueError):

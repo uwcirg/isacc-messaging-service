@@ -62,8 +62,8 @@ class Migration:
         with open(os.path.join(self.migrations_dir, filename), "r") as migration_file:
             for line in migration_file:
                 match = re.match(r"# Previous version: (.+)", line)
-                if match:
-                    prev_migration_id = match.group(1) if match.group(1) != 'None' else None
+                if match and match.group(1) != 'None':
+                    prev_migration_id = match.group(1)
                     break
         return prev_migration_id
 
@@ -125,9 +125,7 @@ class Migration:
     def get_latest_applied_migration_from_fhir(self) -> str:
         """Retrieve the latest applied migration migration id from FHIR."""
         # Logic to retrieve the latest applied migration number from FHIR
-        basic = HAPI_request('GET', 'Basic', params={
-            "identifier": f"http://isacc.app/twilio-message-sid|{id}"
-        })
+        basic = MigrationManager.get_resource()
         basic = first_in_bundle(basic)
 
         if basic is None:
@@ -143,19 +141,17 @@ class Migration:
     def update_latest_applied_migration_in_fhir(self, latest_applied_migration: str):
         """Update the latest applied migration id in FHIR."""
         # Logic to update the latest applied migration number in FHIR
-        basic = HAPI_request('GET', 'Basic', params={
-            "identifier": f"http://isacc.app/twilio-message-sid|{id}"
-        })
+        basic = MigrationManager.get_resource()
         basic = first_in_bundle(basic)
 
         if basic is None:
-            self.create_applied_migration_manager()
+            basic = self.create_applied_migration_manager()
 
         manager = MigrationManager(basic)
         manager.update_migration(latest_applied_migration)
 
 
-    def create_applied_migration_manager(self, initial_applied_migration: str = ""):
+    def create_applied_migration_manager(self, initial_applied_migration: str = None):
         """Create new FHIR resource to keep track of Migration History."""
         message = "No Migration History for this repository. Initializing new Migration Manager"
 
@@ -173,4 +169,4 @@ class Migration:
             'created': created_time,
         }
 
-        HAPI_request('POST', 'Basic', resource=m)
+        return MigrationManager.create_resource(m)
