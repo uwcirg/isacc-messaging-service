@@ -5,7 +5,7 @@ from migrations.migration import Migration
 
 @pytest.fixture
 def migration_instance():
-    return Migration(os.path.dirname(__file__))
+    return Migration()
 
 @pytest.fixture
 def mock_get_previous_migration_id():
@@ -26,8 +26,8 @@ def test_build_migration_sequence_empty(mock_get_previous_migration_id):
 
 def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_id):
     # Mock the output of get_migration_files
-    fake_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
-    with patch.object(Migration, 'get_migration_files', return_value=fake_filenames):
+    mock_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
+    with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id
         mock_get_previous_migration_id.side_effect = {
             'migration2.py': 'migration1',
@@ -47,8 +47,8 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
 
 def test_build_migration_sequence_with_circular_dependency(mock_get_previous_migration_id):
     # Mock the output of get_migration_files
-    fake_filenames = ['migration1.py', 'migration2.py']
-    with patch.object(Migration, 'get_migration_files', return_value=fake_filenames):
+    mock_filenames = ['migration1.py', 'migration2.py']
+    with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
             'migration2.py': 'migration1',

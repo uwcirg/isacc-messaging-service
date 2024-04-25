@@ -42,9 +42,7 @@ class Migration:
         for filename in migration_files:
             curr_migration = filename[:-3]
             prev_migration = self.get_previous_migration_id(filename)
-
-            if prev_migration is not None:
-                migration_sequence[curr_migration] = prev_migration
+            migration_sequence[curr_migration] = prev_migration
 
         # Perform DFS from each node
         for node in migration_sequence:
