@@ -63,7 +63,7 @@ class Migration:
             for line in migration_file:
                 match = re.match(r"# Previous version: (.+)", line)
                 if match:
-                    prev_migration_id = match.group(1)
+                    prev_migration_id = match.group(1) if match != 'None' else None
                     break
         return prev_migration_id
 

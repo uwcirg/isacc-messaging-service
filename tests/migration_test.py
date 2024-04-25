@@ -30,9 +30,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id
         mock_get_previous_migration_id.side_effect = {
-            'migration2.py': 'migration1',
-            'migration3.py': 'migration2',
-            'migration1.py': None
+            'migration2': 'migration1',
+            'migration3': 'migration2',
+            'migration1': None
         }.get
 
         # Instantiate YourClass
@@ -51,16 +51,17 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
-            'migration2.py': 'migration1',
-            'migration1.py': 'migration2'
+            'migration2': 'migration1',
+            'migration1': 'migration2'
         }.get
 
         # Instantiate YourClass
         your_instance = Migration()
 
-        # Call the method to test
-        with pytest.raises(ValueError):
+        # Call the method to test and assert the raised ValueError with the expected message
+        with pytest.raises(ValueError) as exc_info:
             your_instance.build_migration_sequence()
+        assert str(exc_info.value) == "Cycle detected in migration sequence for migration1.py"
 
 def test_build_migration_sequence(migration_instance):
     migration_sequence = migration_instance.build_migration_sequence()
