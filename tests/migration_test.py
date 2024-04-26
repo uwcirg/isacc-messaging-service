@@ -54,7 +54,7 @@ def mock_get_previous_migration_id():
         yield mock
 
 
-def test_build_migration_sequence_empty(mock_get_previous_migration_id):
+def test_build_migration_sequence_empty():
     # Mock the output of get_migration_files
     with patch.object(Migration, 'get_migration_files', return_value=[]):
         # Instantiate Migration class
@@ -87,6 +87,27 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         # Assert the result
         expected_result = {'migration1': None, 'migration2': 'migration1', 'migration3': 'migration2'}
         assert result == expected_result
+
+
+def test_get_previous_migration_down_revision_exists(migration_instance):
+    migration_name = "migration123.py"
+    migration_content = "down_revision = 'migration123'\n"
+
+    with patch("builtins.open", create=True) as mock_open:
+        mock_file = mock_open.return_value.__enter__.return_value
+        mock_file.read.return_value = migration_content
+
+        down_revision = migration_instance.get_previous_migration_down_revision(migration_name)
+
+        assert down_revision == "migration123"
+
+
+def test_get_previous_migration_down_revision_nonexistent_file(migration_instance):
+    migration_name = "nonexistent_migration.py"
+
+    down_revision = migration_instance.get_previous_migration_down_revision(migration_name)
+
+    assert down_revision is None
 
 
 def test_build_migration_sequence_with_circular_dependency(mock_get_previous_migration_id):

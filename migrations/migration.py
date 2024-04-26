@@ -1,14 +1,20 @@
+"""Migration Module
+
+Captures common methods needed by the system for migration
+"""
+
 import os
 from typing import List
 from datetime import datetime
 import uuid
 import re
+import imp
 
+from migrations.migration_resource import MigrationManager
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.fhir import (
     first_in_bundle,
 )
-from migrations.migration_resource import MigrationManager
 
 class Migration:
     def __init__(self, migrations_dir=None):
@@ -62,29 +68,38 @@ class Migration:
         migration_files = os.listdir(self.migrations_dir)
         return migration_files
 
-    def get_previous_migration_id(self, filename: str) -> str:
-        """Retrieve the id of the previously ran (downstream) migration script."""
-        prev_migration_id = None
-        with open(os.path.join(self.migrations_dir, filename), "r") as migration_file:
-            for line in migration_file:
-                match = re.match(r"# Previous version: (.+)", line)
-                if match and match.group(1) != 'None':
-                    prev_migration_id = match.group(1)
-                    break
-        return prev_migration_id
+    def get_previous_migration_down_revision(self, filename: str) -> str:
+        """Retrieve the down_revision from a migration script."""
+        down_revision = None
+        migration_path = os.path.join(self.migrations_dir, filename)
+        if os.path.exists(migration_path):
+            try:
+                migration_module = imp.load_source("migration_module", migration_path)
+                down_revision = getattr(migration_module, "down_revision", None)
+            except Exception as e:
+                print(f"Error loading migration script {filename}: {e}")
+        else:
+            print(f"Migration script {filename} does not exist.")
+        return down_revision
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
-        current_id = str(self.get_latest_applied_migration_from_fhir())
+        current_id = self.get_latest_applied_migration_from_fhir()
         new_id = str(uuid.uuid4())  # Random string as the migration identifier
         migration_filename = f"{new_id}.py"
         migration_path = os.path.join(self.migrations_dir, migration_filename)
+                
         with open(migration_path, "w") as migration_file:
             migration_file.write(f"# Migration script generated for {migration_name}\n")
-            migration_file.write(f"# Current version: {new_id}\n")
-            migration_file.write(f"# Previous version: {current_id}\n")
+            migration_file.write(f"revision = '{new_id}'\n")
+            migration_file.write(f"down_revision = '{current_id}'\n")
             migration_file.write("\n")
-            migration_file.write("# Add your migration code here\n")
+            migration_file.write("def upgrade():\n")
+            migration_file.write("    # Add your upgrade migration code here\n")
+            migration_file.write("\n")
+            migration_file.write("def downgrade():\n")
+            migration_file.write("    # Add your downgrade migration code here\n")
+            
         return migration_filename
 
     def run_migrations(self, direction: str):
@@ -104,14 +119,16 @@ class Migration:
             raise ValueError("No valid migration files to run.")
 
         migration_path = os.path.join(self.migrations_dir, applied_migration)
-        with open(migration_path, "r") as migration_file:
-            migration_code = migration_file.read()
-            try:
-                exec(migration_code)
-                self.update_latest_applied_migration_in_fhir(applied_migration)
+        try:
+            migration_module = imp.load_source('migration_module', migration_path)
+            if direction == "upgrade":
+                migration_module.upgrade()
+            elif direction == "downgrade":
+                migration_module.downgrade()
 
-            except Exception as e:
-                print(f"Error executing migration {applied_migration}: {e}")
+            self.update_latest_applied_migration_in_fhir(applied_migration)
+        except Exception as e:
+            print(f"Error executing migration {applied_migration}: {e}")
 
     def get_next_migration(self, current_migration) -> str:
         """Retrieve the latest."""
@@ -135,12 +152,10 @@ class Migration:
         basic = first_in_bundle(basic)
 
         if basic is None:
-            self.create_applied_migration_manager()
-
             return None
 
         manager = MigrationManager(basic)
-        latest_applied_migration = manager.get_migration()
+        latest_applied_migration = manager.get_latest_migration()
 
         return latest_applied_migration
 
@@ -170,9 +185,8 @@ class Migration:
         created_time = datetime.now().astimezone().isoformat()
         m = {
             'resourceType': 'Basic',
-            'identifier': [{"system": "http://our.migration.system", "value": system_wide_id_or_latest_applied_migration}],
             'code': {"coding": [{ "system": "http://our.migration.system", "code": initial_applied_migration}]},
             'created': created_time,
         }
 
-        return MigrationManager.create_resource(m)
+        return MigrationManager.create_resource(resource=m)
