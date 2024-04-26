@@ -68,7 +68,7 @@ class Migration:
         migration_files = os.listdir(self.migrations_dir)
         return migration_files
 
-    def get_previous_migration_down_revision(self, filename: str) -> str:
+    def get_previous_migration_id(self, filename: str) -> str:
         """Retrieve the down_revision from a migration script."""
         down_revision = None
         migration_path = os.path.join(self.migrations_dir, filename)

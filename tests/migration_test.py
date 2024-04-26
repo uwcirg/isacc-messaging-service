@@ -89,7 +89,7 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         assert result == expected_result
 
 
-def test_get_previous_migration_down_revision_exists(migration_instance):
+def test_get_previous_migration_id_exists(migration_instance):
     migration_name = "migration123.py"
     migration_content = "down_revision = 'migration123'\n"
 
@@ -97,15 +97,15 @@ def test_get_previous_migration_down_revision_exists(migration_instance):
         mock_file = mock_open.return_value.__enter__.return_value
         mock_file.read.return_value = migration_content
 
-        down_revision = migration_instance.get_previous_migration_down_revision(migration_name)
+        down_revision = migration_instance.get_previous_migration_id(migration_name)
 
         assert down_revision == "migration123"
 
 
-def test_get_previous_migration_down_revision_nonexistent_file(migration_instance):
+def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration_name = "nonexistent_migration.py"
 
-    down_revision = migration_instance.get_previous_migration_down_revision(migration_name)
+    down_revision = migration_instance.get_previous_migration_id(migration_name)
 
     assert down_revision is None
 
