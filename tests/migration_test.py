@@ -89,18 +89,6 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         assert result == expected_result
 
 
-def test_get_previous_migration_id_exists(migration_instance):
-    migration_name = "migration123.py"
-    migration_content = "down_revision = 'migration123'\n"
-    migration_path = os.path.join(migration_instance.migrations_dir, migration_name)
-    with open(migration_path, "w") as migration_file:
-        migration_file.write(migration_content)
-
-    down_revision = migration_instance.get_previous_migration_id(migration_name)
-
-    assert down_revision == "migration123"
-
-
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration_name = "nonexistent_migration.py"
 
@@ -175,6 +163,21 @@ def test_get_previous_migration(migration_instance):
     current_migration = "current_migration"
     previous_migration = migration_instance.get_previous_migration(current_migration)
     assert previous_migration is None
+
+
+def test_get_previous_migration_id_exists(migration_instance):
+    migration_name = "migration123.py"
+    migration_content = "down_revision = 'migration122'\n"
+    migration_path = os.path.join(migration_instance.migrations_dir, migration_name)
+    with open(migration_path, "w") as migration_file:
+        migration_file.write(migration_content)
+
+    down_revision = migration_instance.get_previous_migration_id(migration_name)
+
+    assert down_revision == "migration122"
+
+    # Delete the migration file after assertion
+    os.remove(migration_path)
 
 
 # TODO: test FHIR management logic
