@@ -91,15 +91,14 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
 
 def test_get_previous_migration_id_exists(migration_instance):
     migration_name = "migration123.py"
-    migration_content = "down_revision = 'migration123'\n"
+    migration_content = "# down_revision = 'migration123'\n"
+    migration_path = os.path.join(migration_instance.migrations_dir, migration_name)
+    with open(migration_path, "w") as migration_file:
+        migration_file.write(migration_content)
 
-    with patch("builtins.open", create=True) as mock_open:
-        mock_file = mock_open.return_value.__enter__.return_value
-        mock_file.read.return_value = migration_content
+    down_revision = migration_instance.get_previous_migration_id(migration_name)
 
-        down_revision = migration_instance.get_previous_migration_id(migration_name)
-
-        assert down_revision == "migration123"
+    assert down_revision == "migration123"
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
