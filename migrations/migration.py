@@ -94,7 +94,8 @@ class Migration:
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
-        current_id = self.get_latest_applied_migration_from_fhir()
+        # current_id = self.get_latest_applied_migration_from_fhir()
+        current_id = self.get_latest_created_migration()
         new_id = str(uuid.uuid4())  # Random string as the migration identifier
         migration_filename = f"{new_id}.py"
         migration_path = os.path.join(self.migrations_dir, migration_filename)
@@ -158,18 +159,29 @@ class Migration:
             )
 
     def get_next_migration(self, current_migration) -> str:
-        """Retrieve the latest."""
+        """Retrieve the next migration."""
         for current_node, previous_node in self.migration_sequence.items():
             if str(previous_node) == str(current_migration):
                 return current_node
         return None
 
     def get_previous_migration(self, current_migration) -> str:
-        """Retrieve the latest."""
+        """Retrieve the previous migration."""
         if current_migration in self.migration_sequence:
             return self.migration_sequence.get(current_migration)
         else:
             return None
+
+    def get_latest_created_migration(self) -> str:
+        """Retrieve the latest migration in the entire migration sequence."""
+        # Collect all previous migrations
+        previous_migrations = set(self.migration_sequence.values())
+
+        # Find the migration with no outgoing edge (i.e., no subsequent migration)
+        for current_migration in self.migration_sequence.keys():
+            if current_migration not in previous_migrations:
+                return current_migration
+        return None
 
     ## FHIR MANAGEMENT LOGIC
     def get_latest_applied_migration_from_fhir(self) -> str:

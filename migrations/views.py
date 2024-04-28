@@ -14,6 +14,13 @@ def migrate(migration_name):
     migration_manager.generate_migration_script(migration_name)
 
 
+@migration_blueprint.cli.command("insert")
+@click.argument('migration_name')
+def migrate(migration_name):
+    # Generate a new migration script
+    migration_manager.generate_migration_script(migration_name)
+
+
 @migration_blueprint.cli.command("upgrade")
 def upgrade():
     # Run migrations to upgrade the schema
@@ -24,3 +31,9 @@ def upgrade():
 def downgrade():
     # Run migrations to downgrade the schema
     migration_manager.run_migrations("downgrade")
+
+
+@migration_blueprint.cli.command("restart")
+def upgrade():
+    # Run migrations to upgrade the schema
+    migration_manager.update_latest_applied_migration_in_fhir(None)
