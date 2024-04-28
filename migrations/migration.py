@@ -7,7 +7,6 @@ import os
 from typing import List
 from datetime import datetime
 import uuid
-import re
 import imp
 
 from migrations.migration_resource import MigrationManager
@@ -64,9 +63,11 @@ class Migration:
         return migration_sequence
 
     def get_migration_files(self) -> List[str]:
-        """Retrieve the list of migration files."""
+        """Retrieve the list of valid migration files."""
         migration_files = os.listdir(self.migrations_dir)
-        return migration_files
+        python_files = [file for file in migration_files if file.endswith(".py")]
+
+        return python_files
 
     def get_previous_migration_id(self, filename: str) -> str:
         """Retrieve the down_revision from a migration script."""
@@ -77,9 +78,18 @@ class Migration:
                 migration_module = imp.load_source("migration_module", migration_path)
                 down_revision = getattr(migration_module, "down_revision", None)
             except Exception as e:
-                print(f"Error loading migration script {filename}: {e}")
+                message = f"Error loading migration script {filename}: {e}"
+                audit_entry(
+                    message,
+                    level='debug'
+                )
         else:
-            print(f"Migration script {filename} does not exist.")
+            message = f"Migration script {filename} does not exist."
+            audit_entry(
+                message,
+                level='debug'
+            )
+
         return down_revision
 
     def generate_migration_script(self, migration_name: str):
@@ -88,7 +98,7 @@ class Migration:
         new_id = str(uuid.uuid4())  # Random string as the migration identifier
         migration_filename = f"{new_id}.py"
         migration_path = os.path.join(self.migrations_dir, migration_filename)
-                
+
         with open(migration_path, "w") as migration_file:
             migration_file.write(f"# Migration script generated for {migration_name}\n")
             migration_file.write(f"revision = '{new_id}'\n")
@@ -96,44 +106,61 @@ class Migration:
             migration_file.write("\n")
             migration_file.write("def upgrade():\n")
             migration_file.write("    # Add your upgrade migration code here\n")
+            migration_file.write("    print('upgraded')\n")
             migration_file.write("\n")
             migration_file.write("def downgrade():\n")
             migration_file.write("    # Add your downgrade migration code here\n")
-            
+            migration_file.write("    print('downgraded')\n")
+            migration_file.write("\n")
+
         return migration_filename
 
     def run_migrations(self, direction: str):
         """Run migrations based on the specified direction ("upgrade" or "downgrade")."""
+        # Update the migration to acquire most recent updates in the system
+        self.migration_sequence = self.build_migration_sequence()
+
         if direction not in ["upgrade", "downgrade"]:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
-        applied_migration = None
+        applied_migration = 'None'
+        next_migration = 'None'
 
         if direction == "upgrade":
-            applied_migration = self.get_next_migration(current_migration)
+            applied_migration = str(self.get_next_migration(current_migration))
+            next_migration = applied_migration
         elif direction == "downgrade" and current_migration is not None:
             applied_migration = self.get_previous_migration(current_migration)
+            next_migration = current_migration
 
-        if applied_migration is None:
+        if next_migration == 'None':
             raise ValueError("No valid migration files to run.")
 
-        migration_path = os.path.join(self.migrations_dir, applied_migration)
+        migration_path = os.path.join(self.migrations_dir, next_migration + ".py")
         try:
+            audit_entry(
+                "running migration",
+                level='info'
+            )
+
             migration_module = imp.load_source('migration_module', migration_path)
             if direction == "upgrade":
                 migration_module.upgrade()
             elif direction == "downgrade":
                 migration_module.downgrade()
-
             self.update_latest_applied_migration_in_fhir(applied_migration)
         except Exception as e:
-            print(f"Error executing migration {applied_migration}: {e}")
+            message = f"Error executing migration {applied_migration}: {e}"
+            audit_entry(
+                message,
+                level='debug'
+            )
 
     def get_next_migration(self, current_migration) -> str:
         """Retrieve the latest."""
         for current_node, previous_node in self.migration_sequence.items():
-            if previous_node == current_migration:
+            if str(previous_node) == str(current_migration):
                 return current_node
         return None
 
@@ -166,7 +193,7 @@ class Migration:
         basic = first_in_bundle(basic)
 
         if basic is None:
-            basic = self.create_applied_migration_manager()
+            basic = self.create_applied_migration_manager(latest_applied_migration)
 
         manager = MigrationManager(basic)
         manager.update_migration(latest_applied_migration)

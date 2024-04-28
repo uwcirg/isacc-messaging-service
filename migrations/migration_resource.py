@@ -5,6 +5,9 @@ the `fhirclient.Basic` class.
 A single Basic resource is maintained with the most 
 recently (successfully) run migration revision held in the single Basic.code value.
 """
+from isacc_messaging.models.isacc_fhirdate import (
+    IsaccFHIRDate as FHIRDate,
+)
 
 from datetime import datetime
 
@@ -34,19 +37,27 @@ class MigrationManager(Basic):
 
     def persist(self):
         """Persist self state to FHIR store"""
-        response = HAPI_request('PUT', 'Communication', resource_id=self.id, resource=self.as_json())
+        response = HAPI_request(
+            method="PUT",
+            resource_type=self.resource_type,
+            resource_id=self.id,
+            resource=self.as_json())
         return response
 
     def update_migration(self, migration_id: str):
         """Update the migration code on the FHIR"""
-        created_time = datetime.now().astimezone().isoformat()
+        self.created = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
+        self.code.coding[0].code = migration_id
 
-        self.code = {"coding": [{ "system": "http://our.migration.system", "code": migration_id}]}
-        self.created = {'created': created_time}
+        # The extension class init does not define these fields as None
+        self.author = None
+        self.subject = None
+        self.identifier = None
+
         response = self.persist()
         return response
-    
+
     def get_latest_migration(self):
         """Returns most recent available migration"""
-        current_migration = self.code["coding"][0]["code"]
+        current_migration = self.code.coding[0].code
         return current_migration
