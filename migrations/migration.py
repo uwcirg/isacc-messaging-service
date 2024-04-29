@@ -94,16 +94,26 @@ class Migration:
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
-        # current_id = self.get_latest_applied_migration_from_fhir()
-        current_id = self.get_latest_created_migration()
-        new_id = str(uuid.uuid4())  # Random string as the migration identifier
+        current_migration_id = str(self.get_latest_applied_migration_from_fhir())
+        latest_created_migration_id = str(self.get_latest_created_migration())
+        if current_migration_id != latest_created_migration_id:
+            error_message = f"There is an unapplied migration, {latest_created_migration_id}."
+
+            audit_entry(
+                error_message,
+                level='error'
+            )
+
+            raise ValueError(error_message)
+
+        new_id = str(uuid.uuid4())
         migration_filename = f"{new_id}.py"
         migration_path = os.path.join(self.migrations_dir, migration_filename)
 
         with open(migration_path, "w") as migration_file:
             migration_file.write(f"# Migration script generated for {migration_name}\n")
             migration_file.write(f"revision = '{new_id}'\n")
-            migration_file.write(f"down_revision = '{current_id}'\n")
+            migration_file.write(f"down_revision = '{current_migration_id}'\n")
             migration_file.write("\n")
             migration_file.write("def upgrade():\n")
             migration_file.write("    # Add your upgrade migration code here\n")
