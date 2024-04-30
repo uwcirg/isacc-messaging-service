@@ -132,22 +132,6 @@ def test_get_previous_migration_id(migration_instance):
     assert prev_migration_id is None
 
 
-# def test_generate_migration_script(migration_instance, mocker, new_migration_manager_result):    
-#     # Mock HAPI search failing to find a matching patient
-#     mocker.patch(
-#         "migrations.migration_resource.requests.get",
-#         return_value=mock_response(new_migration_manager_result),
-#     )
-
-#     migration_name = "new_test_migration"
-#     migration_filename = migration_instance.generate_migration_script(migration_name)
-#     migration_path = os.path.join(migration_instance.migrations_dir, migration_filename)
-
-#     assert isinstance(migration_filename, str)
-#     assert migration_filename.endswith('.py')
-#     assert os.path.exists(migration_path)
-
-
 def test_run_migrations_invalid_direction(migration_instance):
     with pytest.raises(ValueError):
         migration_instance.run_migrations(direction="invalid_direction")
@@ -178,6 +162,3 @@ def test_get_previous_migration_id_exists(migration_instance):
 
     # Delete the migration file after assertion
     os.remove(migration_path)
-
-
-# TODO: test FHIR management logic
