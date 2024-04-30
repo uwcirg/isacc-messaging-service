@@ -28,21 +28,6 @@ class mock_response:
         raise Exception("status code ain't 200")
 
 
-# @fixture
-# def active_migration_manager_match(datadir):
-#     return load_json(datadir, "active_migration_manager_match.json")
-
-
-# @fixture
-# def active_migration_manager_miss(datadir):
-#     return load_json(datadir, "active_migration_manager_miss.json")
-
-
-# @fixture
-# def new_migration_manager_result(datadir):
-#     return load_json(datadir, "new_migration_manager_result.json")
-
-
 @fixture
 def migration_instance():
     return Migration()

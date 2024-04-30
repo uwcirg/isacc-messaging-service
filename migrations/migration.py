@@ -97,7 +97,7 @@ class Migration:
         current_migration_id = str(self.get_latest_applied_migration_from_fhir())
         latest_created_migration_id = str(self.get_latest_created_migration())
         if current_migration_id != latest_created_migration_id:
-            error_message = f"There is an unapplied migration, {latest_created_migration_id}."
+            error_message = f"There exists an unapplied migration."
 
             audit_entry(
                 error_message,
@@ -135,19 +135,29 @@ class Migration:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
-        applied_migration = 'None'
-        next_migration = 'None'
+        applied_migrations = None
+        unapplied_migrations = None
 
         if direction == "upgrade":
-            applied_migration = str(self.get_next_migration(current_migration))
-            next_migration = applied_migration
+            unapplied_migrations = self.get_unapplied_migrations(current_migration)
         elif direction == "downgrade" and current_migration is not None:
-            applied_migration = self.get_previous_migration(current_migration)
-            next_migration = current_migration
+            applied_migrations = self.get_previous_migration(current_migration)
+            unapplied_migrations = current_migration
 
-        if next_migration == 'None':
+        if unapplied_migrations == None or unapplied_migrations == 'None':
             raise ValueError("No valid migration files to run.")
 
+        if direction == "upgrade":
+            # Run all available migrations
+            for migration in unapplied_migrations:
+                self.run_migration(direction, migration, migration)
+        if direction == "downgrade":
+            # Run one migration down
+            self.run_migration(direction, unapplied_migrations, applied_migrations)
+
+    def run_migration(self, direction: str, next_migration: str, applied_migration: str):
+        """Run single migration based on the specified direction ("upgrade" or "downgrade")."""
+        # Update the migration to acquire most recent updates in the system
         migration_path = os.path.join(self.migrations_dir, next_migration + ".py")
         try:
             audit_entry(
@@ -174,6 +184,21 @@ class Migration:
             if str(previous_node) == str(current_migration):
                 return current_node
         return None
+
+    def get_unapplied_migrations(self, applied_migration) -> list:
+        """Retrieve all migrations after the applied migration."""
+        visited = set()
+        unapplied_migrations = []
+
+        def dfs(node):
+            visited.add(node)
+            for current_node, previous_node in self.migration_sequence.items():
+                if previous_node == node and current_node not in visited:
+                    unapplied_migrations.append(current_node)
+                    dfs(current_node)
+
+        dfs(applied_migration)
+        return unapplied_migrations
 
     def get_previous_migration(self, current_migration) -> str:
         """Retrieve the previous migration."""
