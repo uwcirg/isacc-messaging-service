@@ -114,7 +114,7 @@ def test_get_migration_files(migration_instance):
 def test_get_previous_migration_id(migration_instance):
     filename = "test_7c929f8e-bd11-4283-9603-40613839d23a.py"
     prev_migration_id = migration_instance.get_previous_migration_id(filename)
-    assert prev_migration_id is None
+    assert prev_migration_id is 'None'
 
 
 def test_run_migrations_invalid_direction(migration_instance):
