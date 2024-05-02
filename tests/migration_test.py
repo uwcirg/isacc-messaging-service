@@ -46,10 +46,10 @@ def test_build_migration_sequence_empty():
         migration_instance = Migration()
 
         # Call the method to test
-        result = migration_instance.build_migration_sequence()
+        migration_instance.build_migration_sequence()
 
         # Assert that the result is an empty dictionary
-        assert result == {}
+        assert migration_instance.head == None
 
 
 def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_id):
@@ -67,11 +67,13 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         migration_instance = Migration()
 
         # Call the method to test
-        result = migration_instance.build_migration_sequence()
+        migration_instance.build_migration_sequence()
 
         # Assert the result
-        expected_result = {'migration1': None, 'migration2': 'migration1', 'migration3': 'migration2'}
-        assert result == expected_result
+        assert migration_instance.head.migration == 'migration3'
+        assert migration_instance.head.prev_migration.migration == 'migration2'
+        assert migration_instance.head.prev_migration.prev_migration.migration == 'migration1'
+        assert migration_instance.head.prev_migration.prev_migration.prev_migration.migration is None
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
@@ -99,11 +101,6 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
             Migration()
 
         assert str(exc_info.value) == "Cycle detected in migration sequence for migration1"
-
-
-def test_build_migration_sequence(migration_instance):
-    migration_sequence = migration_instance.build_migration_sequence()
-    assert isinstance(migration_sequence, dict)
 
 
 def test_get_migration_files(migration_instance):
