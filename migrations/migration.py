@@ -42,7 +42,7 @@ class Migration:
     def build_migration_sequence(self):
         migration_files: list = self.get_migration_files()
         migration_nodes: dict = {}
-
+        print(migration_files)
         # First, create all migration nodes without linking them
         for filename in migration_files:
             migration = filename[:-3]
@@ -52,10 +52,12 @@ class Migration:
         # Second, link each migration node to its previous migration node
         for migration, node in migration_nodes.items():
             prev_node_id = self.get_previous_migration_id(migration)
-
+            print("previous node id", prev_node_id)
             if prev_node_id:
                 prev_node = migration_nodes.get(prev_node_id)
+                print("previous node", prev_node_id)
                 if prev_node:
+                    print("previous node exists", prev_node_id)
                     # If there is a previous migration, link it to the current node
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
@@ -104,9 +106,11 @@ class Migration:
         print("CHECKING MIGRATION FOR CYCLES")
         slow: MigrationNode = self.head
         fast: MigrationNode = self.head
-        print(f"IS IT EQUAL {slow == fast}")
+        print(f"IS {slow} EQUAL {slow == fast}")
+        print(f"{fast} and {fast.prev_node}")
 
         while slow and fast and fast.prev_node:
+            print("new")
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
             print(fast)
@@ -116,7 +120,7 @@ class Migration:
                     error_message = "Cycle detected in migration sequence."
                     audit_entry(error_message, level='error')
                     raise ValueError(error_message)
-
+        print("Skipped")
         return False
 
     def generate_migration_script(self, migration_name: str):
