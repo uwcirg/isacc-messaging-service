@@ -58,18 +58,19 @@ class Migration:
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
                     prev_node.next_node = node
-        print(migration_nodes)
+
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in migration_nodes.values():
-            print("migration node ",node)
-            print("migration node next",node.next_node)
             if node.next_node is None:
-                print("new head", node)
                 self.head = node
                 break
+        
+        # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
+        if self.head == None:
+            error_message = "Cycle detected in migration sequence."
+            audit_entry(error_message, level='error')
+            raise ValueError(error_message)
 
-        # Set the head of the linked list to be the node with no 'next_node'
-        self.check_for_cycles()
 
     def get_migration_files(self) -> list:
         migration_files = os.listdir(self.migrations_dir)
@@ -100,27 +101,6 @@ class Migration:
 
         return down_revision
 
-    def check_for_cycles(self):
-        """Check the linked list for cycles using the Tortoise and Hare algorithm."""
-        print("CHECKING MIGRATION FOR CYCLES")
-        slow: MigrationNode = self.head
-        fast: MigrationNode = self.head
-        print(f"IS {slow} EQUAL {slow == fast}")
-        print(f"{fast} and {fast.prev_node}")
-
-        while slow and fast and fast.prev_node:
-            print("new")
-            slow = slow.prev_node
-            fast = fast.prev_node.prev_node
-            print(fast)
-            print(slow)
-            if slow == fast:
-                    print("VICTORY")
-                    error_message = "Cycle detected in migration sequence."
-                    audit_entry(error_message, level='error')
-                    raise ValueError(error_message)
-        print("Skipped")
-        return False
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
