@@ -140,17 +140,20 @@ class Migration:
         """Run migrations based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
         self.build_migration_sequence()
-
+        print("HEAD",self.head)
         if direction not in ["upgrade", "downgrade"]:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
+        print("latest migration", current_migration)
         applied_migrations = None
         unapplied_migrations = None
         if direction == "upgrade":
             unapplied_migrations = self.get_unapplied_migrations(current_migration)
+            print("unapplied migrations", unapplied_migrations)
         elif direction == "downgrade" and current_migration is not None:
             applied_migrations = self.get_previous_migration(current_migration)
+            print("applied migrations", applied_migrations)
             unapplied_migrations = current_migration
 
         if not unapplied_migrations or unapplied_migrations == 'None':
@@ -201,11 +204,15 @@ class Migration:
     def get_unapplied_migrations(self, applied_migration) -> list:
         """Retrieve all migrations after the applied migration."""
         unapplied_migrations = []
-        current_node = self.find_node(applied_migration)
+        current_node = self.head
 
-        while current_node and current_node.next_node:
-            current_node = current_node.next_node
+        # Iterate over migrations starting from top
+        while current_node and current_node.migration != applied_migration:
             unapplied_migrations.append(current_node.migration)
+            current_node = current_node.prev_node
+
+        # Reverse to account for the order
+        unapplied_migrations.reverse()
 
         return unapplied_migrations
 
