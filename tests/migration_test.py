@@ -73,7 +73,7 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         assert migration_instance.head.migration == 'migration3'
         assert migration_instance.head.prev_node.migration == 'migration2'
         assert migration_instance.head.prev_node.prev_node.migration == 'migration1'
-        assert migration_instance.head.prev_node.prev_node.prev_node.migration is None
+        assert migration_instance.head.prev_node.prev_node.prev_node is None
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
