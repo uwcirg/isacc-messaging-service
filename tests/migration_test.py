@@ -71,9 +71,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
 
         # Assert the result
         assert migration_instance.head.migration == 'migration3'
-        assert migration_instance.head.prev_migration.migration == 'migration2'
-        assert migration_instance.head.prev_migration.prev_migration.migration == 'migration1'
-        assert migration_instance.head.prev_migration.prev_migration.prev_migration.migration is None
+        assert migration_instance.head.prev_node.migration == 'migration2'
+        assert migration_instance.head.prev_node.prev_node.migration == 'migration1'
+        assert migration_instance.head.prev_node.prev_node.prev_node.migration is None
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
@@ -90,8 +90,8 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
-            'migration2.py': 'migration1',
-            'migration1.py': 'migration2'
+            'migration2': 'migration1',
+            'migration1': 'migration2'
         }.get
 
         with pytest.raises(ValueError) as exc_info:

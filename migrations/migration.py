@@ -40,16 +40,13 @@ class Migration:
 
         # First, create all migration nodes without linking them
         for filename in migration_files:
-            print(filename)
             migration = filename[:-3]
             node = MigrationNode(migration)
             migration_nodes[migration] = node
 
         # Second, link each migration node to its previous migration node
-        for filename, node in migration_nodes.items():
-            print(filename)
-            print(node.migration)
-            prev_node_id = self.get_previous_migration_id(filename)
+        for migration, node in migration_nodes.items():
+            prev_node_id = self.get_previous_migration_id(migration)
 
             if prev_node_id:
                 prev_node = migration_nodes.get(prev_node_id)
@@ -58,13 +55,12 @@ class Migration:
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
                     prev_node.next_node = node
-        print(migration_nodes)
+
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in migration_nodes.values():
             if node.next_node is None:
                 self.head = node
                 break
-        print("HEAD",self.head)
 
         # Set the head of the linked list to be the node with no 'next_node'
         self.check_for_cycles()
@@ -162,13 +158,10 @@ class Migration:
         current_migration = self.get_latest_applied_migration_from_fhir()
         applied_migrations = None
         unapplied_migrations = None
-        print("latest applied", current_migration)
         if direction == "upgrade":
             unapplied_migrations = self.get_unapplied_migrations(current_migration)
-            print("upgrade ",unapplied_migrations)
         elif direction == "downgrade" and current_migration is not None:
             applied_migrations = self.get_previous_migration(current_migration)
-            print("downgrade ",applied_migrations)
             unapplied_migrations = current_migration
 
         if not unapplied_migrations or unapplied_migrations == 'None':
@@ -177,7 +170,6 @@ class Migration:
         if direction == "upgrade":
             # Run all available migrations
             for migration in unapplied_migrations:
-                print("NEW", migration)
                 self.run_migration(direction, migration, migration)
         if direction == "downgrade":
             # Run one migration down
@@ -194,11 +186,12 @@ class Migration:
             )
 
             migration_module = imp.load_source('migration_module', migration_path)
+
             if direction == "upgrade":
                 migration_module.upgrade()
             elif direction == "downgrade":
                 migration_module.downgrade()
-            print("I WILL UPDATE TO ", applied_migration)
+
             self.update_latest_applied_migration_in_fhir(applied_migration)
         except Exception as e:
             message = f"Error executing migration {applied_migration}: {e}"
