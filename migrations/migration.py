@@ -62,6 +62,7 @@ class Migration:
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in migration_nodes.values():
             print("migration node ",node)
+            print("migration node next",node.next_node)
             if node.next_node is None:
                 print("new head", node)
                 self.head = node
