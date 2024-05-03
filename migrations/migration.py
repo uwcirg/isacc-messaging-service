@@ -19,8 +19,8 @@ from isacc_messaging.models.fhir import (
 class MigrationNode:
     def __init__(self, migration):
         self.migration: str = migration
-        self.prev_node: MigrationNode = None
-        self.next_node: MigrationNode = None
+        self.prev_node: 'MigrationNode' = None
+        self.next_node: 'MigrationNode' = None
 
     def __repr__(self):
         return f"{self.migration}"
@@ -42,7 +42,6 @@ class Migration:
     def build_migration_sequence(self):
         migration_files: list = self.get_migration_files()
         migration_nodes: dict = {}
-        print(migration_files)
         # First, create all migration nodes without linking them
         for filename in migration_files:
             migration = filename[:-3]
@@ -52,12 +51,9 @@ class Migration:
         # Second, link each migration node to its previous migration node
         for migration, node in migration_nodes.items():
             prev_node_id = self.get_previous_migration_id(migration)
-            print("previous node id", prev_node_id)
             if prev_node_id:
                 prev_node = migration_nodes.get(prev_node_id)
-                print("previous node", prev_node_id)
                 if prev_node:
-                    print("previous node exists", prev_node_id)
                     # If there is a previous migration, link it to the current node
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
