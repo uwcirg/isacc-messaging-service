@@ -218,7 +218,10 @@ class Migration:
 
     def get_latest_created_migration(self) -> str:
         """Retrieve the latest migration in the entire migration sequence."""
-        return self.head.migration
+        if self.head:
+            return self.head.migration
+        else:
+            return None
 
     def find_node(self, migration_name) -> MigrationNode:
         """Find a node in the migration sequence by migration name."""
