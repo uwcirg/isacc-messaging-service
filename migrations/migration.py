@@ -22,6 +22,9 @@ class MigrationNode:
         self.prev_node: MigrationNode = None
         self.next_node: MigrationNode = None
 
+    def __repr__(self):
+        return f"{self.migration}"
+
 
 class Migration:
     def __init__(self, migrations_dir=None):
@@ -37,12 +40,15 @@ class Migration:
 
         # First, create all migration nodes without linking them
         for filename in migration_files:
+            print(filename)
             migration = filename[:-3]
             node = MigrationNode(migration)
             migration_nodes[migration] = node
 
         # Second, link each migration node to its previous migration node
         for filename, node in migration_nodes.items():
+            print(filename)
+            print(node.migration)
             prev_node_id = self.get_previous_migration_id(filename)
 
             if prev_node_id:
@@ -52,12 +58,13 @@ class Migration:
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
                     prev_node.next_node = node
-
+        print(migration_nodes)
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in migration_nodes.values():
             if node.next_node is None:
                 self.head = node
                 break
+        print("HEAD",self.head)
 
         # Set the head of the linked list to be the node with no 'next_node'
         self.check_for_cycles()
@@ -92,20 +99,23 @@ class Migration:
         return down_revision
 
     def check_for_cycles(self):
-        """Check the graph for cycles."""
-        current_node = self.head
-        visited: set[str] = set()
-        while current_node:
-            if current_node.migration in visited:
-                error_message = f"Cycle detected in migration sequence."
-                audit_entry(
-                    error_message,
-                    level='error'
-                )
+        """Check the linked list for cycles using the Tortoise and Hare algorithm."""
+        if not self.head:
+            return False
 
+        tortoise = self.head
+        hare = self.head
+
+        while hare and hare.next_node:
+            tortoise = tortoise.next_node
+            hare = hare.next_node.next_node
+
+            if tortoise == hare:
+                error_message = "Cycle detected in migration sequence."
+                audit_entry(error_message, level='error')
                 raise ValueError(error_message)
-            visited.add(current_node.migration)
-            current_node = current_node.prev_node
+
+        return False
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
@@ -153,7 +163,6 @@ class Migration:
         applied_migrations = None
         unapplied_migrations = None
         print("latest applied", current_migration)
-        
         if direction == "upgrade":
             unapplied_migrations = self.get_unapplied_migrations(current_migration)
             print("upgrade ",unapplied_migrations)
