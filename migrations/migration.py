@@ -203,7 +203,7 @@ class Migration:
         unapplied_migrations = []
         current_node = self.find_node(applied_migration)
 
-        while current_node.next_node:
+        while current_node and current_node.next_node:
             current_node = current_node.next_node
             unapplied_migrations.append(current_node.migration)
 
