@@ -32,9 +32,7 @@ class Migration:
         self.build_migration_sequence()
 
     def build_migration_sequence(self):
-        migration_files = self.get_migration_files()
-
-        # Dictionary to keep track of migration nodes by name
+        migration_files: list = self.get_migration_files()
         migration_nodes: dict = {}
 
         # First, create all migration nodes without linking them
@@ -55,13 +53,16 @@ class Migration:
                     # Link the previous node to the current node as its next node
                     prev_node.next_node = node
 
-            # Set the head of the linked list if it's not set already
-            if not self.head:
+        # Find the migration node that has no 'next_node' (i.e., the tail node)
+        for node in migration_nodes.values():
+            if node.next_node is None:
                 self.head = node
+                break
 
-            self.check_for_cycles()
+        # Set the head of the linked list to be the node with no 'next_node'
+        self.check_for_cycles()
 
-    def get_migration_files(self):
+    def get_migration_files(self) -> list:
         migration_files = os.listdir(self.migrations_dir)
         python_files = [file for file in migration_files if file.endswith(".py")]
         return python_files
@@ -105,7 +106,6 @@ class Migration:
                 raise ValueError(error_message)
             visited.add(current_node.migration)
             current_node = current_node.prev_node
-        return None
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
@@ -152,12 +152,14 @@ class Migration:
         current_migration = self.get_latest_applied_migration_from_fhir()
         applied_migrations = None
         unapplied_migrations = None
+        print("latest applied", current_migration)
         
         if direction == "upgrade":
             unapplied_migrations = self.get_unapplied_migrations(current_migration)
-
+            print("upgrade ",unapplied_migrations)
         elif direction == "downgrade" and current_migration is not None:
             applied_migrations = self.get_previous_migration(current_migration)
+            print("downgrade ",applied_migrations)
             unapplied_migrations = current_migration
 
         if not unapplied_migrations or unapplied_migrations == 'None':
@@ -166,6 +168,7 @@ class Migration:
         if direction == "upgrade":
             # Run all available migrations
             for migration in unapplied_migrations:
+                print("NEW", migration)
                 self.run_migration(direction, migration, migration)
         if direction == "downgrade":
             # Run one migration down
@@ -186,6 +189,7 @@ class Migration:
                 migration_module.upgrade()
             elif direction == "downgrade":
                 migration_module.downgrade()
+            print("I WILL UPDATE TO ", applied_migration)
             self.update_latest_applied_migration_in_fhir(applied_migration)
         except Exception as e:
             message = f"Error executing migration {applied_migration}: {e}"
@@ -197,7 +201,7 @@ class Migration:
     def get_next_migration(self, current_migration) -> str:
         """Retrieve the next migration."""
         current_node = self.head
-        while current_node:
+        while current_node and current_node.prev_node:
             if current_node.prev_node.migration == current_migration:
                 return current_node
             current_node = current_node.prev_node
@@ -206,17 +210,11 @@ class Migration:
     def get_unapplied_migrations(self, applied_migration) -> list:
         """Retrieve all migrations after the applied migration."""
         unapplied_migrations = []
-        current_node = self.head
+        current_node = self.find_node(applied_migration)
 
-        while current_node:
-            if current_node.migration != applied_migration:
-                unapplied_migrations.append(current_node.migration)
-            else:
-                return unapplied_migrations
-            current_node = current_node.prev_node
-
-        # Account for reversed links order
-        unapplied_migrations.reverse()
+        while current_node.next_node:
+            current_node = current_node.next_node
+            unapplied_migrations.append(current_node.migration)
 
         return unapplied_migrations
 

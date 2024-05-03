@@ -60,7 +60,7 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         mock_get_previous_migration_id.side_effect = {
             'migration2.py': 'migration1',
             'migration3.py': 'migration2',
-            'migration1.py': None
+            'migration1.py': 'None'
         }.get
 
         # Instantiate Migration class
@@ -77,9 +77,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
-    migration_name = "nonexistent_migration.py"
+    migration = "nonexistent_migration"
 
-    down_revision = migration_instance.get_previous_migration_id(migration_name)
+    down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision is None
 
@@ -109,7 +109,7 @@ def test_get_migration_files(migration_instance):
 
 
 def test_get_previous_migration_id(migration_instance):
-    filename = "test_7c929f8e-bd11-4283-9603-40613839d23a.py"
+    filename = "test_7c929f8e-bd11-4283-9603-40613839d23a"
     prev_migration_id = migration_instance.get_previous_migration_id(filename)
     assert prev_migration_id is 'None'
 
@@ -132,13 +132,13 @@ def test_get_previous_migration(migration_instance):
 
 
 def test_get_previous_migration_id_exists(migration_instance):
-    migration_name = "migration123.py"
+    migration = "migration123"
     migration_content = "down_revision = 'migration122'\n"
-    migration_path = os.path.join(migration_instance.migrations_dir, migration_name)
+    migration_path = os.path.join(migration_instance.migrations_dir, migration + ".py")
     with open(migration_path, "w") as migration_file:
         migration_file.write(migration_content)
 
-    down_revision = migration_instance.get_previous_migration_id(migration_name)
+    down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision == "migration122"
 
