@@ -25,6 +25,11 @@ class MigrationNode:
     def __repr__(self):
         return f"{self.migration}"
 
+    def __eq__(self, other):
+        if isinstance(other, MigrationNode):
+            return self.migration == other.migration
+        return False
+
 
 class Migration:
     def __init__(self, migrations_dir=None):
