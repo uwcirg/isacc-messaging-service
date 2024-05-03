@@ -58,9 +58,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
     with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
         # Mock the output of get_previous_migration_id
         mock_get_previous_migration_id.side_effect = {
-            'migration2.py': 'migration1',
-            'migration3.py': 'migration2',
-            'migration1.py': 'None'
+            'migration2': 'migration1',
+            'migration3': 'migration2',
+            'migration1': 'None'
         }.get
 
         # Instantiate Migration class
