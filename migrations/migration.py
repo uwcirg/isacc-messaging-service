@@ -60,9 +60,10 @@ class Migration:
                     prev_node.next_node = node
         print(migration_nodes)
         # Find the migration node that has no 'next_node' (i.e., the tail node)
-        for node in migration_nodes.keys():
+        for node in migration_nodes.values():
             print("migration node ",node)
             if node.next_node is None:
+                print("new head", node)
                 self.head = node
                 break
 
