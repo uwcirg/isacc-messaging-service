@@ -101,14 +101,18 @@ class Migration:
 
     def check_for_cycles(self):
         """Check the linked list for cycles using the Tortoise and Hare algorithm."""
+        print("CHECKING MIGRATION FOR CYCLES")
         slow: MigrationNode = self.head
         fast: MigrationNode = self.head
+        print(f"IS IT EQUAL {slow == fast}")
 
-        while slow and fast and fast.next_node:
-            slow = slow.next_node
-            fast = fast.next_node.next_node
-
+        while slow and fast and fast.prev_node:
+            slow = slow.prev_node
+            fast = fast.prev_node.prev_node
+            print(fast)
+            print(slow)
             if slow == fast:
+                    print("VICTORY")
                     error_message = "Cycle detected in migration sequence."
                     audit_entry(error_message, level='error')
                     raise ValueError(error_message)
