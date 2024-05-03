@@ -58,9 +58,10 @@ class Migration:
                     node.prev_node = prev_node
                     # Link the previous node to the current node as its next node
                     prev_node.next_node = node
-
+        print(migration_nodes)
         # Find the migration node that has no 'next_node' (i.e., the tail node)
-        for node in migration_nodes.values():
+        for node in migration_nodes.keys():
+            print("migration node ",node)
             if node.next_node is None:
                 self.head = node
                 break
