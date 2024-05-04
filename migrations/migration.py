@@ -43,8 +43,7 @@ class Migration:
                 self.migration_sequence.insert(prev_node_id, curr_node)
 
         # Find the migration node that has no 'next_node' to setup as the head
-        last_node = self.migration_sequence.get_last_node()
-        self.migration_sequence.set_head(last_node)
+        self.migration_sequence.update_head(curr_node)
 
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
         if self.migration_sequence.check_for_cycles() and len(migration_files) > 0:

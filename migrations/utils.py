@@ -62,11 +62,12 @@ class LinkedList:
 
         return unapplied_migrations
 
-    def get_last_node(self) -> str:
+    def update_head(self) -> str:
         """Returns node without an outgoing edge to other node."""
         current_node = self.head
         while current_node and current_node.next_node:
             current_node = current_node.next_node
+            self.head = current_node
         return current_node
 
     def append(self, data):
@@ -109,6 +110,9 @@ class LinkedList:
         # If do not exist, create the nodes
         prev_node = prev_node if prev_node else Node(prev_node_data)
         curr_node = curr_node if curr_node else Node(curr_node_data)
+
+        if self.head is None:
+            self.head = curr_node
 
         prev_node.next_node = curr_node
         curr_node.prev_node = prev_node
