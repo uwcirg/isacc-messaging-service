@@ -38,7 +38,7 @@ class Migration:
         for curr_node in migration_nodes:
             # Find the downgrade node
             prev_node_id = self.get_previous_migration_id(curr_node)
-            # If downgrade node is a valid node, add it
+            # If downgrade references a valid node, add it
             if prev_node_id in migration_nodes:
                 self.migration_sequence.insert(prev_node_id, curr_node)
 

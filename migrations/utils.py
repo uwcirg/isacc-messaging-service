@@ -65,9 +65,9 @@ class LinkedList:
     def get_last_node(self) -> str:
         """Returns node without an outgoing edge to other node."""
         current_node = self.head
-        print("CURRENT NODE,", current_node)
         while current_node is not None and current_node.next_node is not None:
             current_node = current_node.next_node
+        return current_node
 
     def append(self, data):
         """Append node after the head."""
@@ -96,8 +96,6 @@ class LinkedList:
 
     def insert(self, prev_node_data:str, curr_node_data: str):
         """Insert node before the curr_node."""
-        if self.head is None:
-            self.head = Node(curr_node_data)
         # Look for the nodes
         prev_node = self.find(prev_node_data) 
         curr_node = self.find(curr_node_data)
@@ -133,7 +131,6 @@ class LinkedList:
         """Display all of the nodes"""
         current_node = self.head
         while current_node is not None:
-            print(current_node.data)
             current_node = current_node.next_node
 
     def check_for_cycles(self):
@@ -142,12 +139,8 @@ class LinkedList:
         fast = self.head
 
         while fast is not None and fast.prev_node is not None:
-            print("FAST",fast)
-            print("SLOW", slow)
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
-            print("FAST",fast)
-            print("SLOW", slow)
             if slow == fast:
                 return True
 
