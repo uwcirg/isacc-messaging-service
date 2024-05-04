@@ -96,6 +96,9 @@ class LinkedList:
 
     def insert(self, prev_node_data:str, curr_node_data: str):
         """Insert node before the curr_node."""
+        if self.head is None:
+            self.head = Node(curr_node_data)
+
         # Look for the nodes
         prev_node = self.find(prev_node_data) 
         curr_node = self.find(curr_node_data)
