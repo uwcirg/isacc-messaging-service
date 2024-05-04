@@ -37,16 +37,14 @@ class Migration:
         # Second, link each migration node to its previous migration node
         for curr_node in migration_nodes:
             # Find the downgrade node
-            prev_node_id = self.get_previous_migration_id(curr_node.data)
+            prev_node_id = self.get_previous_migration_id(curr_node)
             # If downgrade node is a valid node, add it
             if prev_node_id in migration_nodes:
                 self.migration_sequence.insert(prev_node_id, curr_node)
 
         # Find the migration node that has no 'next_node' to setup as the head
-        for node in migration_nodes:
-            if node.next_node is None:
-                self.migration_sequence.set_head(node)
-                break
+        last_node = self.migration_sequence.get_last_node()
+        self.migration_sequence.set_head(last_node)
 
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
         if self.migration_sequence.check_for_cycles() and len(migration_files) > 0:
