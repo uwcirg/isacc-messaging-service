@@ -110,9 +110,6 @@ class LinkedList:
         prev_node = prev_node if prev_node else Node(prev_node_data)
         curr_node = curr_node if curr_node else Node(curr_node_data)
 
-        if self.head is None:
-            self.head = curr_node
-
         prev_node.next_node = curr_node
         curr_node.prev_node = prev_node
 
@@ -144,16 +141,14 @@ class LinkedList:
 
     def check_for_cycles(self):
         """Check whether there exists any cycles within the list."""
+        if not self.head:
+            return True
+
         slow = self.head
         fast = self.head
-
-        while fast is not None and fast.prev_node is not None:
-            print("SLOW",slow)
-            print("FAST",fast)
+        while fast and fast.prev_node:
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
-            print("SLOW",slow)
-            print("FAST",fast)
 
             if slow == fast:
                 return True
