@@ -65,7 +65,7 @@ class LinkedList:
     def get_last_node(self) -> str:
         """Returns node without an outgoing edge to other node."""
         current_node = self.head
-        while current_node is not None and current_node.next_node is not None:
+        while current_node and current_node.next_node:
             current_node = current_node.next_node
         return current_node
 
