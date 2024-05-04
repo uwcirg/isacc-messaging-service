@@ -10,25 +10,11 @@ import uuid
 import imp
 
 from migrations.migration_resource import MigrationManager
+from migrations.utils import Node, LinkedList
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.fhir import (
     first_in_bundle,
 )
-
-
-class MigrationNode:
-    def __init__(self, migration):
-        self.migration: str = migration
-        self.prev_node: 'MigrationNode' = None
-        self.next_node: 'MigrationNode' = None
-
-    def __repr__(self):
-        return f"{self.migration}"
-
-    def __eq__(self, other):
-        if isinstance(other, MigrationNode):
-            return self.migration == other.migration
-        return False
 
 
 class Migration:
@@ -36,50 +22,48 @@ class Migration:
         if migrations_dir is None:
             migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
         self.migrations_dir = migrations_dir
-        self.head: MigrationNode = None
+        self.migration_sequence = LinkedList()
         self.build_migration_sequence()
 
     def build_migration_sequence(self):
         migration_files: list = self.get_migration_files()
-        migration_nodes: dict = {}
+        migration_nodes: list = []
+
         # First, create all migration nodes without linking them
         for filename in migration_files:
             migration = filename[:-3]
-            node = MigrationNode(migration)
-            migration_nodes[migration] = node
+            node = Node(migration)
+            migration_nodes.append(node)
 
         # Second, link each migration node to its previous migration node
-        for migration, node in migration_nodes.items():
-            prev_node_id = self.get_previous_migration_id(migration)
-            if prev_node_id:
-                prev_node = migration_nodes.get(prev_node_id)
-                if prev_node:
-                    # If there is a previous migration, link it to the current node
-                    node.prev_node = prev_node
-                    # Link the previous node to the current node as its next node
-                    prev_node.next_node = node
+        for curr_node in migration_nodes:
+            # Find the downgrade node
+            prev_node_id = self.get_previous_migration_id(curr_node.data)
+            prev_node = Node(prev_node_id)
+            # If downgrade node is a valid node, add it
+            if prev_node in migration_nodes:
+                self.migration_sequence.insert(prev_node, curr_node)
 
-        # Find the migration node that has no 'next_node' (i.e., the tail node)
-        for node in migration_nodes.values():
+        # Find the migration node that has no 'next_node' to setup as the head
+        for node in migration_nodes:
             if node.next_node is None:
-                self.head = node
+                self.migration_sequence.set_head(node)
                 break
-        
+
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
-        if self.head == None and len(migration_files) > 0:
+        if self.migration_sequence.head is None and len(migration_files) > 0:
             error_message = "Cycle detected in migration sequence"
             audit_entry(error_message, level='error')
             raise ValueError(error_message)
-
 
     def get_migration_files(self) -> list:
         migration_files = os.listdir(self.migrations_dir)
         python_files = [file for file in migration_files if file.endswith(".py")]
         return python_files
 
-    def get_previous_migration_id(self, filename: str) -> str:
+    def get_previous_migration_id(self, migration_id: str) -> str:
         """Retrieve the down_revision from a migration script."""
-        filename = filename + ".py"
+        filename = migration_id + ".py"
         down_revision = None
         migration_path = os.path.join(self.migrations_dir, filename)
         if os.path.exists(migration_path):
@@ -100,7 +84,6 @@ class Migration:
             )
 
         return down_revision
-
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
@@ -140,20 +123,16 @@ class Migration:
         """Run migrations based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
         self.build_migration_sequence()
-        print("HEAD",self.head)
         if direction not in ["upgrade", "downgrade"]:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
-        print("latest migration", current_migration)
         applied_migrations = None
         unapplied_migrations = None
         if direction == "upgrade":
             unapplied_migrations = self.get_unapplied_migrations(current_migration)
-            print("unapplied migrations", unapplied_migrations)
         elif direction == "downgrade" and current_migration is not None:
             applied_migrations = self.get_previous_migration(current_migration)
-            print("applied migrations", applied_migrations)
             unapplied_migrations = current_migration
 
         if not unapplied_migrations or unapplied_migrations == 'None':
@@ -192,52 +171,17 @@ class Migration:
                 level='debug'
             )
 
-    def get_next_migration(self, current_migration) -> str:
-        """Retrieve the next migration."""
-        current_node = self.head
-        while current_node and current_node.prev_node:
-            if current_node.prev_node.migration == current_migration:
-                return current_node
-            current_node = current_node.prev_node
-        return None
-
     def get_unapplied_migrations(self, applied_migration) -> list:
         """Retrieve all migrations after the applied migration."""
-        unapplied_migrations = []
-        current_node = self.head
-
-        # Iterate over migrations starting from top
-        while current_node and current_node.migration != applied_migration:
-            unapplied_migrations.append(current_node.migration)
-            current_node = current_node.prev_node
-
-        # Reverse to account for the order
-        unapplied_migrations.reverse()
-
-        return unapplied_migrations
+        return self.migration_sequence.get_sublist(applied_migration)
 
     def get_previous_migration(self, current_migration) -> str:
         """Retrieve the previous migration."""
-        current_node = self.find_node(current_migration)
-        if current_node and current_node.prev_node:
-            return current_node.prev_node.migration
-        return None
+        return self.migration_sequence.get_previous_node(current_migration)
 
     def get_latest_created_migration(self) -> str:
         """Retrieve the latest migration in the entire migration sequence."""
-        if self.head:
-            return self.head.migration
-        else:
-            return None
-
-    def find_node(self, migration_name) -> MigrationNode:
-        """Find a node in the migration sequence by migration name."""
-        current_node = self.head
-        while current_node:
-            if current_node.migration == migration_name:
-                return current_node
-            current_node = current_node.prev_node
-        return None
+        return self.migration_sequence.get_head()
 
     ## FHIR MANAGEMENT LOGIC
     def get_latest_applied_migration_from_fhir(self) -> str:
