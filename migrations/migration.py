@@ -32,7 +32,7 @@ class Migration:
         # First, create all migration nodes without linking them
         for filename in migration_files:
             migration = filename[:-3]
-            migration_nodes.append(node)
+            migration_nodes.append(migration)
 
         # Second, link each migration node to its previous migration node
         for curr_node in migration_nodes:
