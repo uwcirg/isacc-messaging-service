@@ -21,7 +21,7 @@ class LinkedList:
     def find(self, data):
         """Find the first node containing the specified data."""
         current_node = self.head
-        while current_node is not None:
+        while current_node:
             if current_node.data == data:
                 return current_node
             current_node = current_node.prev_node
@@ -79,7 +79,7 @@ class LinkedList:
             self.head = new_node
         else:
             current_node = self.head
-            while current_node.next_node is not None:
+            while current_node.next_node:
                 current_node = current_node.next_node
             current_node.next_node = new_node
             new_node.prev_node = current_node
@@ -95,7 +95,7 @@ class LinkedList:
             self.head = new_node
         else:
             current_node = self.head
-            while current_node.prev_node is not None:
+            while current_node.prev_node:
                 current_node = current_node.prev_node
             current_node.prev_node = new_node
             new_node.next_node = current_node
@@ -125,7 +125,7 @@ class LinkedList:
         """Rever the order of the nodes."""
         current_node = self.head
         prev_node = None
-        while current_node is not None:
+        while current_node:
             next_node = current_node.next_node
             current_node.next_node = prev_node
             current_node.prev_node = next_node
@@ -136,7 +136,8 @@ class LinkedList:
     def display(self):
         """Display all of the nodes"""
         current_node = self.head
-        while current_node is not None:
+        while current_node:
+            print(current_node)
             current_node = current_node.next_node
 
     def check_for_cycles(self):
