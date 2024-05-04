@@ -71,7 +71,10 @@ class LinkedList:
 
     def append(self, data):
         """Append node after the head."""
-        new_node = Node(data)
+        new_node = self.find(data)
+        # If do not exist, create the nodes
+        new_node = new_node if new_node else Node(data)
+
         if self.head is None:
             self.head = new_node
         else:
@@ -84,7 +87,10 @@ class LinkedList:
 
     def prepend(self, data):
         """Prepend node at the tail of the list."""
-        new_node = Node(data)
+        new_node = self.find(data)
+        # If do not exist, create the nodes
+        new_node = new_node if new_node else Node(data)
+
         if self.head is None:
             self.head = new_node
         else:
@@ -96,9 +102,6 @@ class LinkedList:
 
     def insert(self, prev_node_data:str, curr_node_data: str):
         """Insert node before the curr_node."""
-        if self.head is None:
-            self.head = Node(curr_node_data)
-
         # Look for the nodes
         prev_node = self.find(prev_node_data) 
         curr_node = self.find(curr_node_data)
@@ -106,6 +109,9 @@ class LinkedList:
         # If do not exist, create the nodes
         prev_node = prev_node if prev_node else Node(prev_node_data)
         curr_node = curr_node if curr_node else Node(curr_node_data)
+
+        if self.head is None:
+            self.head = curr_node
 
         prev_node.next_node = curr_node
         curr_node.prev_node = prev_node
@@ -142,8 +148,13 @@ class LinkedList:
         fast = self.head
 
         while fast is not None and fast.prev_node is not None:
+            print("SLOW",slow)
+            print("FAST",fast)
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
+            print("SLOW",slow)
+            print("FAST",fast)
+
             if slow == fast:
                 return True
 
