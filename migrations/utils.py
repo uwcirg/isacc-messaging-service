@@ -65,10 +65,8 @@ class LinkedList:
     def update_head(self, current_node_data = None):
         """Returns node without an outgoing edge to other node."""
         current_node = self.find(current_node_data)
-        print(f"CURRENT {type(current_node)}",current_node)
         if not current_node:
             current_node = self.head
-        print(f"CURRENT {type(current_node)}",current_node)
         while current_node and current_node.next_node:
             current_node = current_node.next_node
             self.head = current_node
