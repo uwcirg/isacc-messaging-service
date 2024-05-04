@@ -63,7 +63,7 @@ class LinkedList:
         return unapplied_migrations
 
     def append(self, data):
-        """Append node to the head."""
+        """Append node after the head."""
         new_node = Node(data)
         if self.head is None:
             self.head = new_node
@@ -73,9 +73,10 @@ class LinkedList:
                 current_node = current_node.next_node
             current_node.next_node = new_node
             new_node.prev_node = current_node
+            self.head = new_node
 
     def prepend(self, data):
-        """Append node before the head."""
+        """Prepend node at the tail of the list."""
         new_node = Node(data)
         if self.head is None:
             self.head = new_node
@@ -86,13 +87,17 @@ class LinkedList:
             current_node.prev_node = new_node
             new_node.next_node = current_node
 
-    def insert(self, prev_node, curr_node):
+    def insert(self, prev_node_data:str, curr_node_data: str):
         """Insert node before the curr_node."""
-        if not isinstance(prev_node, Node) or not isinstance(curr_node, Node):
-            raise ValueError("Both nodes should be valid objects.")
-
         if self.head is None:
-            self.head = curr_node
+            self.head = Node(curr_node_data)
+        # Look for the nodes
+        prev_node = self.find(prev_node_data) 
+        curr_node = self.find(curr_node_data)
+
+        # If do not exist, create the nodes
+        prev_node = prev_node if prev_node else Node(prev_node_data)
+        curr_node = curr_node if curr_node else Node(curr_node_data)
 
         prev_node.next_node = curr_node
         curr_node.prev_node = prev_node
@@ -129,7 +134,7 @@ class LinkedList:
         slow = self.head
         fast = self.head
 
-        while fast is not None and fast.next is not None:
+        while fast is not None and fast.prev_node is not None:
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
             if slow == fast:

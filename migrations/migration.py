@@ -32,17 +32,15 @@ class Migration:
         # First, create all migration nodes without linking them
         for filename in migration_files:
             migration = filename[:-3]
-            node = Node(migration)
             migration_nodes.append(node)
 
         # Second, link each migration node to its previous migration node
         for curr_node in migration_nodes:
             # Find the downgrade node
             prev_node_id = self.get_previous_migration_id(curr_node.data)
-            prev_node = Node(prev_node_id)
             # If downgrade node is a valid node, add it
-            if prev_node in migration_nodes:
-                self.migration_sequence.insert(prev_node, curr_node)
+            if prev_node_id in migration_nodes:
+                self.migration_sequence.insert(prev_node_id, curr_node)
 
         # Find the migration node that has no 'next_node' to setup as the head
         for node in migration_nodes:
