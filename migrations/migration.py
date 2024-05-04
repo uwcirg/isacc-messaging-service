@@ -51,7 +51,7 @@ class Migration:
                 break
 
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
-        if self.migration_sequence.head is None and len(migration_files) > 0:
+        if self.migration_sequence.check_for_cycles() and len(migration_files) > 0:
             error_message = "Cycle detected in migration sequence"
             audit_entry(error_message, level='error')
             raise ValueError(error_message)

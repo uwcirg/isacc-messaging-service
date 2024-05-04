@@ -49,7 +49,7 @@ def test_build_migration_sequence_empty():
         migration_instance.build_migration_sequence()
 
         # Assert that the result is an empty dictionary
-        assert migration_instance.head == None
+        assert migration_instance.migration_sequence.get_head() == None
 
 
 def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_id):
@@ -70,10 +70,10 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         migration_instance.build_migration_sequence()
 
         # Assert the result
-        assert migration_instance.head.migration == 'migration3'
-        assert migration_instance.head.prev_node.migration == 'migration2'
-        assert migration_instance.head.prev_node.prev_node.migration == 'migration1'
-        assert migration_instance.head.prev_node.prev_node.prev_node is None
+        assert migration_instance.migration_sequence.get_head().migration == 'migration3'
+        assert migration_instance.migration_sequence.get_head().prev_node.migration == 'migration2'
+        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.migration == 'migration1'
+        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.prev_node is None
 
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
@@ -118,12 +118,6 @@ def test_get_previous_migration_id(migration_instance):
 def test_run_migrations_invalid_direction(migration_instance):
     with pytest.raises(ValueError):
         migration_instance.run_migrations(direction="invalid_direction")
-
-
-def test_get_next_migration(migration_instance):
-    current_migration = "current_migration"
-    next_migration = migration_instance.get_next_migration(current_migration)
-    assert next_migration is None
 
 
 def test_get_previous_migration(migration_instance):

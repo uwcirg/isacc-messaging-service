@@ -123,3 +123,16 @@ class LinkedList:
         while current_node is not None:
             print(current_node.data)
             current_node = current_node.next_node
+
+    def check_for_cycles(self):
+        """Check whether there exists any cycles within the list."""
+        slow = self.head
+        fast = self.head
+
+        while fast is not None and fast.next is not None:
+            slow = slow.prev_node
+            fast = fast.prev_node.prev_node
+            if slow == fast:
+                return True
+
+        return False
