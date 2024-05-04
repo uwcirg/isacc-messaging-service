@@ -62,13 +62,13 @@ class LinkedList:
 
         return unapplied_migrations
 
-    def update_head(self) -> str:
+    def update_head(self, current_node = None) -> str:
         """Returns node without an outgoing edge to other node."""
-        current_node = self.head
+        if not current_node:
+            current_node = self.head
         while current_node and current_node.next_node:
             current_node = current_node.next_node
             self.head = current_node
-        return current_node
 
     def append(self, data):
         """Append node after the head."""
