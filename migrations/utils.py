@@ -18,7 +18,7 @@ class LinkedList:
     def __init__(self):
         self.head = None
 
-    def find(self, data):
+    def find(self, data) -> Node:
         """Find the first node containing the specified data."""
         current_node = self.head
         while current_node:
@@ -62,8 +62,9 @@ class LinkedList:
 
         return unapplied_migrations
 
-    def update_head(self, current_node = None) -> str:
+    def update_head(self, current_node_data = None) -> str:
         """Returns node without an outgoing edge to other node."""
+        current_node = self.find(current_node_data)
         if not current_node:
             current_node = self.head
         while current_node and current_node.next_node:
