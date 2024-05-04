@@ -70,9 +70,9 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
         migration_instance.build_migration_sequence()
 
         # Assert the result
-        assert migration_instance.migration_sequence.get_head().migration == 'migration3'
-        assert migration_instance.migration_sequence.get_head().prev_node.migration == 'migration2'
-        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.migration == 'migration1'
+        assert migration_instance.migration_sequence.get_head().data == 'migration3'
+        assert migration_instance.migration_sequence.get_head().prev_node.data == 'migration2'
+        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.data == 'migration1'
         assert migration_instance.migration_sequence.get_head().prev_node.prev_node.prev_node is None
 
 

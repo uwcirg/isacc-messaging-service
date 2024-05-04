@@ -65,11 +65,9 @@ class LinkedList:
     def get_last_node(self) -> str:
         """Returns node without an outgoing edge to other node."""
         current_node = self.head
-        while current_node is not None:
-            if current_node.next_node is None:
-                return current_node
+        print("CURRENT NODE,", current_node)
+        while current_node is not None and current_node.next_node is not None:
             current_node = current_node.next_node
-        return None
 
     def append(self, data):
         """Append node after the head."""
@@ -144,8 +142,12 @@ class LinkedList:
         fast = self.head
 
         while fast is not None and fast.prev_node is not None:
+            print("FAST",fast)
+            print("SLOW", slow)
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
+            print("FAST",fast)
+            print("SLOW", slow)
             if slow == fast:
                 return True
 
