@@ -27,29 +27,18 @@ class Migration:
 
     def build_migration_sequence(self):
         migration_files: list = self.get_migration_files()
-        migration_nodes: list = []
+        migration_nodes: dict = {}
 
         # First, create all migration nodes without linking them
         for filename in migration_files:
-            migration = filename[:-3]
-            migration_nodes.append(migration)
+            migration: str = filename[:-3]
+            migration_nodes[migration] = self.get_previous_migration_id(migration)
 
-        # Second, link each migration node to its previous migration node
-        for curr_node in migration_nodes:
-            # Find the downgrade node
-            prev_node_id = self.get_previous_migration_id(curr_node)
-            # If downgrade references a valid node, add it
-            if prev_node_id in migration_nodes:
-                self.migration_sequence.insert(prev_node_id, curr_node)
-
-        # Find the migration node that has no 'next_node' to setup as the head
-        self.migration_sequence.update_head()
-
-        # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
-        if self.migration_sequence.check_for_cycles() and len(migration_files) > 0:
-            error_message = "Cycle detected in migration sequence"
-            audit_entry(error_message, level='error')
-            raise ValueError(error_message)
+        if len(migration_files) > 0:
+            self.migration_sequence.build_list_from_array()
+        else:
+            error_message = "No valid migration files."
+            audit_entry(error_message, level='info')
 
 
     def get_migration_files(self) -> list:
@@ -123,7 +112,7 @@ class Migration:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
-        if self.migration_sequence.find(current_migration) is None:
+        if current_migration and self.migration_sequence.find(current_migration) is None:
             message = "Applied migration does not exist in the migration system"
             audit_entry(
                 message,
@@ -131,6 +120,7 @@ class Migration:
             )
 
             raise KeyError(message)
+
         applied_migrations = None
         unapplied_migrations = None
         if direction == "upgrade":

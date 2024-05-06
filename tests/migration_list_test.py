@@ -1,67 +1,54 @@
 import pytest
-from migrations.utils import Node, LinkedList
+from pytest import fixture
+from migrations.utils import LinkedList
 
-@pytest.fixture
+
+@fixture
 def linked_list():
     return LinkedList()
 
-def test_linked_list_operations(linked_list):
-    # Create nodes
-    node_a = Node("A")
-    node_b = Node("B")
-    node_c = Node("C")
 
-    # Test append
-    linked_list.append(node_a)
-    linked_list.append(node_b)
-    linked_list.append(node_c)
+def test_append(linked_list):
+    linked_list.append("A")
+    linked_list.append("B")
+    linked_list.append("C")
+    assert linked_list.get_head().data == "A"
+    assert linked_list.get_head().next_node.data == "B"
+    assert linked_list.get_head().next_node.next_node.data == "C"
 
-    # Test prepend
-    linked_list.prepend(Node("D"))
-    assert linked_list.head.data == "D"
 
-    # Test insert
-    linked_list.insert("D", Node("E"))
-    assert linked_list.head.next_node.data == "E"
+def test_find(linked_list):
+    linked_list.append("A")
+    linked_list.append("B")
+    linked_list.append("C")
+    assert linked_list.find("B").data == "B"
+    assert linked_list.find("D") is None
 
-    # Test find
-    found_node = linked_list.find("B")
-    assert found_node == node_b
 
-    # Test get_following_node
-    following_node = linked_list.get_following_node("C")
-    assert following_node.data == "B"
+def test_get_previous_node(linked_list):
+    linked_list.append("A")
+    linked_list.append("B")
+    linked_list.append("C")
+    assert linked_list.get_previous_node("C") == "B"
+    assert linked_list.get_previous_node("A") is None
 
-    # Test get_previous_node
-    previous_node = linked_list.get_previous_node("E")
-    assert previous_node.data == "D"
 
-    # Test get_sublist
-    sublist = linked_list.get_sublist("D", "B")
-    assert sublist == ["E", "D"]
+def test_get_sublist(linked_list):
+    linked_list.append("A")
+    linked_list.append("B")
+    linked_list.append("C")
+    linked_list.append("D")
+    assert linked_list.get_sublist("B", "D") == ["C", "D"]
+    assert linked_list.get_sublist("A") == ["B", "C", "D"]
 
-    # Test update_head
-    linked_list.update_head("C")
-    assert linked_list.head.data == "C"
 
-    # Test set_head
-    linked_list.set_head(node_a)
-    assert linked_list.head == node_a
+def test_check_for_cycles(linked_list):
+    linked_list.append("A")
+    linked_list.append("B")
+    linked_list.append("C")
+    linked_list.append("D")
+    assert linked_list.check_for_cycles() == False
 
-    # Test get_head
-    head = linked_list.get_head()
-    assert head == node_a
-
-    # Test reverse
-    linked_list.reverse()
-    assert linked_list.head.data == "C"
-
-    # Test display
-    linked_list.display()  # Simply check if it runs without errors
-
-    # Test check_for_cycles
-    assert not linked_list.check_for_cycles()
-
-    # Create cycle
-    node_c.next_node = node_a
-    assert linked_list.check_for_cycles()
+    # Introduce a cycle
+    linked_list.find("D").prev_node = linked_list.find("A")
+    assert linked_list.check_for_cycles() == True

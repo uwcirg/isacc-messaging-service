@@ -1,15 +1,8 @@
 import os
 import pytest
-import json
 from unittest.mock import patch
 from migrations.migration import Migration
 from pytest import fixture
-
-
-def load_json(datadir, filename):
-    with open(os.path.join(datadir, filename), "r") as json_file:
-        data = json.load(json_file)
-    return data
 
 
 class mock_response:
@@ -44,7 +37,6 @@ def test_build_migration_sequence_empty():
     with patch.object(Migration, 'get_migration_files', return_value=[]):
         # Instantiate Migration class
         migration_instance = Migration()
-
         # Call the method to test
         migration_instance.build_migration_sequence()
 
@@ -78,7 +70,6 @@ def test_build_migration_sequence_with_dependencies(mock_get_previous_migration_
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration = "nonexistent_migration"
-
     down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision is None
@@ -91,7 +82,9 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
-            'migration1': 'migration2'
+            'migration1': 'migration3',
+            'migration3': 'migration4',
+            'migration4': 'migration2',
         }.get
 
         with pytest.raises(ValueError) as exc_info:
@@ -100,7 +93,7 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
             # It should raises an error
             Migration()
 
-        assert str(exc_info.value) == "Cycle detected in migration sequence"
+        assert str(exc_info.value) == "Cycle detected in the list"
 
 
 def test_get_migration_files(migration_instance):
@@ -131,7 +124,6 @@ def test_get_previous_migration_id_exists(migration_instance):
     migration_path = os.path.join(migration_instance.migrations_dir, migration + ".py")
     with open(migration_path, "w") as migration_file:
         migration_file.write(migration_content)
-
     down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision == "migration122"
