@@ -123,6 +123,14 @@ class Migration:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
+        if self.migration_sequence.find(current_migration) is None:
+            message = "Applied migration does not exist in the migration system"
+            audit_entry(
+                message,
+                level='info'
+            )
+
+            raise KeyError(message)
         applied_migrations = None
         unapplied_migrations = None
         if direction == "upgrade":

@@ -91,8 +91,7 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
         # Mock the output of get_previous_migration_id to create circular dependency
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
-            'migration1': 'migration3',
-            'migration3': 'migration2'
+            'migration1': 'migration2'
         }.get
 
         with pytest.raises(ValueError) as exc_info:
