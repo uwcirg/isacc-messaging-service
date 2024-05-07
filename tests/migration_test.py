@@ -93,7 +93,7 @@ def test_build_migration_sequence_with_circular_dependency(mock_get_previous_mig
             # It should raises an error
             Migration()
 
-        assert str(exc_info.value) == "Cycle detected in the list"
+        assert str(exc_info.value) == "Cycle detected in migration sequence"
 
 
 def test_get_migration_files(migration_instance):

@@ -57,7 +57,7 @@ class LinkedList:
 
     def get_sublist(self, first_node_data: str, last_node_data: str = None) -> list:
         """Return a list consistings of nodes between the specified boundaries.
-        Non-inclusive of endpoints."""
+        Inclusive of endpoints."""
         unapplied_migrations = []
         if last_node_data is None:
             last_node = self.head
@@ -122,19 +122,3 @@ class LinkedList:
     def get_head(self):
         """Get the head node."""
         return self.head
-
-    def check_for_cycles(self):
-        """Check whether there exists any cycles within the list."""
-        if not self.head:
-            return True
-
-        slow = self.head
-        fast = self.head
-        while fast and fast.prev_node:
-            slow = slow.prev_node
-            fast = fast.prev_node.prev_node
-
-            if slow == fast:
-                return True
-
-        return False

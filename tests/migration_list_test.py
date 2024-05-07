@@ -52,9 +52,14 @@ def test_linked_list_get_previous_node(linked_list):
     assert node == "node2"
 
 
+def test_linked_list_get_empty_sublist(linked_list):
+    sublist = linked_list.get_sublist(linked_list.get_head().data)
+    assert len(sublist) == 0
+
+
 def test_linked_list_get_sublist(linked_list):
-    sublist = linked_list.get_sublist("node2", "node4")
-    assert sublist == ["node3"]
+    sublist = linked_list.get_sublist("node2")
+    assert sublist == ["node3", "node4"]
 
 
 def test_linked_list_append(linked_list):
