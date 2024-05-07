@@ -29,13 +29,17 @@ class Migration:
         migration_files: list = self.get_migration_files()
         migration_nodes: dict = {}
 
-        # First, create all migration nodes without linking them
         for filename in migration_files:
             migration: str = filename[:-3]
             migration_nodes[migration] = self.get_previous_migration_id(migration)
 
         if len(migration_files) > 0:
-            self.migration_sequence.build_list_from_array()
+            try:
+                self.migration_sequence.build_list_from_dictionary(migration_nodes)
+            except:
+                error_message = "Cycle detected in migration sequence"
+                audit_entry(error_message, level='error')
+                raise ValueError(error_message)
         else:
             error_message = "No valid migration files."
             audit_entry(error_message, level='info')
@@ -72,8 +76,12 @@ class Migration:
 
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
+        self.build_migration_sequence()
         current_migration_id = str(self.get_latest_applied_migration_from_fhir())
+        print(f"applied migration {type(current_migration_id)}")
         latest_created_migration_id = str(self.get_latest_created_migration())
+        print(f"created migration {latest_created_migration_id}")
+
         if current_migration_id != latest_created_migration_id:
             error_message = f"There exists an unapplied migration."
 
@@ -108,11 +116,14 @@ class Migration:
         """Run migrations based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
         self.build_migration_sequence()
+        print("my migration", self.migration_sequence.display())
         if direction not in ["upgrade", "downgrade"]:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
         if current_migration and self.migration_sequence.find(current_migration) is None:
+            print("migration sequence",self.migration_sequence.display())
+            print("current migration",current_migration)
             message = "Applied migration does not exist in the migration system"
             audit_entry(
                 message,

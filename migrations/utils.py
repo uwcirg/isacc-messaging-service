@@ -12,17 +12,31 @@ class Node:
             return self.data == other.data
         return False
 
+    def __hash__(self):
+        return hash(self.data)
+
+
 class LinkedList:
     def __init__(self):
         self.head = None
 
     def find(self, data) -> Node:
         """Find the first node containing the specified data."""
+        # Traverse forward
+        current_node = self.head
+        while current_node:
+            if current_node.data == data:
+                return current_node
+            current_node = current_node.next_node
+
+        # If not found, start from the tail node
         current_node = self.head
         while current_node:
             if current_node.data == data:
                 return current_node
             current_node = current_node.prev_node
+
+        # If not found, return None
         return None
 
     def get_following_node(self, current_node_data) -> Node:
@@ -76,23 +90,30 @@ class LinkedList:
             new_node.prev_node = current_node
             self.head = new_node
 
-    def build_list_from_array(self, migration_nodes: dict):
-        # Second, link each node to its previous node
-        for migration, node in migration_nodes.items():
-            prev_node_id = migration_nodes[migration]
-            if prev_node_id:
-                prev_node = Node(prev_node_id) if not self.find(prev_node_id) else self.find(prev_node_id)
-                # If there is a previous node, link it to the current node
-                node.prev_node = prev_node
-                # Link the previous node to the current node as its next node
-                prev_node.next_node = node
+    def build_list_from_dictionary(self, previous_nodes: dict):
+        nodes_references: dict = {}
+        # Make sure we are working with Nodes
+        for key in previous_nodes.keys():
+            node = Node(key)
+            nodes_references[key] = node
 
-        # Find the node that has no 'next_node' (i.e., the tail node)
-        for node in migration_nodes.values():
+        # First, create all migration nodes without linking them
+        for migration, node in nodes_references.items():
+            prev_node_id = previous_nodes[migration]
+            if prev_node_id != 'None':
+                prev_node = nodes_references[prev_node_id]
+                if prev_node:
+                    # If there is a previous migration, link it to the current node
+                    node.prev_node = prev_node
+                    # Link the previous node to the current node as its next node
+                    prev_node.next_node = node
+
+        # Find the migration node that has no 'next_node' (i.e., the tail node)
+        for node in nodes_references.values():
             if node.next_node is None:
-                self.set_head(node)
+                self.head = node
                 break
-    
+
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
         if self.head == None:
             error_message = "Cycle detected in the list"
@@ -106,23 +127,14 @@ class LinkedList:
         """Get the head node."""
         return self.head
 
-    def display(self):
-        """Display all of the nodes"""
-        current_node = self.head
-        while current_node:
-            print(current_node)
-            current_node = current_node.next_node
-
     def check_for_cycles(self):
         """Check whether there exists any cycles within the list."""
         if not self.head:
-            print("THINKS IT IS FALSE")
             return True
 
         slow = self.head
         fast = self.head
         while fast and fast.prev_node:
-            print(f"{fast} and {fast.prev_node}")
             slow = slow.prev_node
             fast = fast.prev_node.prev_node
 
