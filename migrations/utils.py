@@ -119,10 +119,6 @@ class LinkedList:
             error_message = "Cycle detected in the list"
             raise ValueError(error_message)
 
-    def set_head(self, new_head):
-        """Set the head node."""
-        self.head = new_head
-
     def get_head(self):
         """Get the head node."""
         return self.head

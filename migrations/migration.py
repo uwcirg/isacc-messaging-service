@@ -78,9 +78,7 @@ class Migration:
         """Generate a new migration script."""
         self.build_migration_sequence()
         current_migration_id = str(self.get_latest_applied_migration_from_fhir())
-        print(f"applied migration {type(current_migration_id)}")
         latest_created_migration_id = str(self.get_latest_created_migration())
-        print(f"created migration {latest_created_migration_id}")
 
         if current_migration_id != latest_created_migration_id:
             error_message = f"There exists an unapplied migration."
@@ -116,14 +114,11 @@ class Migration:
         """Run migrations based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
         self.build_migration_sequence()
-        print("my migration", self.migration_sequence.display())
         if direction not in ["upgrade", "downgrade"]:
             raise ValueError("Invalid migration direction. Use 'upgrade' or 'downgrade'.")
 
         current_migration = self.get_latest_applied_migration_from_fhir()
         if current_migration and self.migration_sequence.find(current_migration) is None:
-            print("migration sequence",self.migration_sequence.display())
-            print("current migration",current_migration)
             message = "Applied migration does not exist in the migration system"
             audit_entry(
                 message,
