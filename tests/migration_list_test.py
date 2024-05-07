@@ -59,7 +59,7 @@ def test_linked_list_get_empty_sublist(linked_list):
 
 def test_linked_list_get_sublist(linked_list):
     sublist = linked_list.get_sublist("node2")
-    assert sublist == ["node3", "node4"]
+    assert sublist == ["node3", "node4", "node5"]
 
 
 def test_linked_list_append(linked_list):

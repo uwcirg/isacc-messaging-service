@@ -57,7 +57,7 @@ class LinkedList:
 
     def get_sublist(self, first_node_data: str, last_node_data: str = None) -> list:
         """Return a list consistings of nodes between the specified boundaries.
-        Inclusive of endpoints."""
+        Inclusive of last endpoint."""
         unapplied_migrations = []
         if last_node_data is None:
             last_node = self.head
