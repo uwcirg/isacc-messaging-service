@@ -6,11 +6,11 @@ from pytest import fixture
 @fixture
 def linked_list():
     ll = LinkedList()
-    ll.append("node1")
-    ll.append("node2")
-    ll.append("node3")
-    ll.append("node4")
-    ll.append("node5")
+    ll.add("node1")
+    ll.add("node2")
+    ll.add("node3")
+    ll.add("node4")
+    ll.add("node5")
     return ll
 
 
@@ -62,8 +62,8 @@ def test_linked_list_get_sublist(linked_list):
     assert sublist == ["node3", "node4", "node5"]
 
 
-def test_linked_list_append(linked_list):
-    linked_list.append("node6")
+def test_linked_list_add(linked_list):
+    linked_list.add("node6")
     assert linked_list.get_head().data == "node6"
 
 

@@ -78,7 +78,7 @@ class LinkedList:
         """Add node after the head."""
         new_node = self.find(data)
         if new_node:
-            
+            raise ValueError("adding a duplicate item")
         else:
             new_node = Node(data)
 
