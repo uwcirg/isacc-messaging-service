@@ -14,13 +14,13 @@ def mock_get_previous_migration_id():
         yield mock
 
 def test_build_migration_sequence_empty(migration_instance):
-    with patch.object(Migration, 'get_migration_files', return_value=[]):
+    with patch.object(Migration, 'get_migrations', return_value=[]):
         migration_instance.build_migration_sequence()
         assert migration_instance.migration_sequence.get_head() is None
 
 def test_build_migration_sequence_with_dependencies(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
-    with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
+    with patch.object(Migration, 'get_migrations', return_value=mock_filenames):
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
             'migration3': 'migration2',
@@ -39,7 +39,7 @@ def test_get_previous_migration_id_nonexistent_file(migration_instance):
 
 def test_build_migration_sequence_with_circular_dependency(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
-    with patch.object(Migration, 'get_migration_files', return_value=mock_filenames):
+    with patch.object(Migration, 'get_migrations', return_value=mock_filenames):
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
             'migration1': 'migration3',
@@ -50,8 +50,8 @@ def test_build_migration_sequence_with_circular_dependency(migration_instance, m
             Migration()
         assert str(exc_info.value) == "Cycle detected in migration sequence"
 
-def test_get_migration_files(migration_instance):
-    migration_files = migration_instance.get_migration_files()
+def test_get_migrations(migration_instance):
+    migration_files = migration_instance.get_migrations()
     assert isinstance(migration_files, list)
 
 def test_get_previous_migration_id_empty(migration_instance):

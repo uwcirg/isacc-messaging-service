@@ -1,45 +1,40 @@
 class Node:
     def __init__(self, data):
+        """Initialize a node with data."""
         self.data = data
         self.prev_node = None
         self.next_node = None
 
     def __repr__(self):
+        """Representation of the node."""
         return f"{self.data}"
 
     def __eq__(self, other):
+        """Check equality of nodes."""
         if isinstance(other, Node):
             return self.data == other.data
         return False
 
     def __hash__(self):
+        """Hash the node's data."""
         return hash(self.data)
 
 
 class LinkedList:
     def __init__(self):
+        """Initialize a linked list."""        
         self.head = None
 
     def find(self, data) -> Node:
         """Find the first node containing the specified data."""
-        # Traverse forward
-        current_node = self.head
-        while current_node:
-            if current_node.data == data:
-                return current_node
-            current_node = current_node.next_node
-
-        # If not found, start from the tail node
         current_node = self.head
         while current_node:
             if current_node.data == data:
                 return current_node
             current_node = current_node.prev_node
-
-        # If not found, return None
         return None
 
-    def get_following_node(self, current_node_data) -> Node:
+    def next(self, current_node_data) -> Node:
         """Retrieve node following the specified one."""
         next_node = self.head
         while next_node and next_node.prev_node:
@@ -48,7 +43,7 @@ class LinkedList:
             next_node = next_node.prev_node
         return None
 
-    def get_previous_node(self, current_node_data) -> Node:
+    def previous(self, current_node_data) -> Node:
         """Retrieve node before the specified one."""
         current_node = self.find(current_node_data)
         if current_node and current_node.prev_node:
@@ -57,7 +52,7 @@ class LinkedList:
 
     def get_sublist(self, first_node_data: str, last_node_data: str = None) -> list:
         """Return a list consistings of nodes between the specified boundaries.
-        Inclusive of last endpoint."""
+        Inclusive of last endpoint, not of first."""
         unapplied_migrations = []
         if last_node_data is None:
             last_node = self.head
@@ -75,7 +70,7 @@ class LinkedList:
         return unapplied_migrations
 
     def add(self, data):
-        """Add node after the head."""
+        """Add new node after the head. Raises an error if node with such migration already exists."""
         new_node = self.find(data)
         if new_node:
             raise ValueError("adding a duplicate item")
@@ -93,8 +88,9 @@ class LinkedList:
                 self.head = new_node
 
     def build_list_from_dictionary(self, previous_nodes: dict):
+        '''Creates a sorted LinkedList where head is the latest created migration in the directory.
+        Tail is the migration pointing to "None," all new migrations are added after the head'''
         nodes_references: dict = {}
-        # Make sure we are working with Nodes
         for key in previous_nodes.keys():
             node = Node(key)
             nodes_references[key] = node
@@ -105,9 +101,7 @@ class LinkedList:
             if prev_node_id != 'None':
                 prev_node = nodes_references[prev_node_id]
                 if prev_node:
-                    # If there is a previous migration, link it to the current node
                     node.prev_node = prev_node
-                    # Link the previous node to the current node as its next node
                     prev_node.next_node = node
 
         # Find the migration node that has no 'next_node' (i.e., the tail node)

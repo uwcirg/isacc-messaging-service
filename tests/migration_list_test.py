@@ -78,3 +78,16 @@ def test_linked_list_build_list_from_dictionary():
     ll = LinkedList()
     ll.build_list_from_dictionary(previous_nodes)
     assert ll.get_head().data == "node5"
+
+def test_linked_list_next(linked_list):
+    """Test the next() method of the LinkedList."""
+    current_node = linked_list.find("node3")
+    next_node = linked_list.next(current_node)
+    assert next_node.data == "node4"
+
+
+def test_linked_list_previous(linked_list):
+    """Test the previous() method of the LinkedList."""
+    current_node = linked_list.find("node3")
+    previous_node = linked_list.previous(current_node)
+    assert previous_node.data == "node2"
