@@ -26,11 +26,10 @@ class Migration:
         self.build_migration_sequence()
 
     def build_migration_sequence(self):
-        migration_files: list = self.get_migration_files()
+        migration_files: list = self.get_migrations()
         migration_nodes: dict = {}
 
-        for filename in migration_files:
-            migration: str = filename[:-3]
+        for migration in migration_files:
             migration_nodes[migration] = self.get_previous_migration_id(migration)
 
         if len(migration_files) > 0:
@@ -45,10 +44,22 @@ class Migration:
             audit_entry(error_message, level='info')
 
 
-    def get_migration_files(self) -> list:
+    def get_migrations(self) -> list:
         migration_files = os.listdir(self.migrations_dir)
         python_files = [file for file in migration_files if file.endswith(".py")]
-        return python_files
+
+        revisions = []
+        for file_name in python_files:
+            file_path = os.path.join(self.migrations_dir, file_name)
+            module_name = os.path.splitext(file_name)[0]
+            try:
+                migration_module = imp.load_source(module_name, file_path)
+                revision = getattr(migration_module, "revision", None)
+                if revision:
+                    revisions.append(str(revision))
+            except Exception as e:
+                print(f"Error loading migration script {file_name}: {e}")
+        return revisions
 
     def get_previous_migration_id(self, migration_id: str) -> str:
         """Retrieve the down_revision from a migration script."""
@@ -65,6 +76,7 @@ class Migration:
                     message,
                     level='debug'
                 )
+                raise e
         else:
             message = f"Migration script {filename} does not exist."
             audit_entry(

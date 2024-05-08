@@ -74,21 +74,23 @@ class LinkedList:
 
         return unapplied_migrations
 
-    def append(self, data):
-        """Append node after the head."""
+    def add(self, data):
+        """Add node after the head."""
         new_node = self.find(data)
-        # If do not exist, create the nodes
-        new_node = new_node if new_node else Node(data)
-
-        if self.head is None:
-            self.head = new_node
+        if new_node:
+            
         else:
-            current_node = self.head
-            while current_node.next_node:
-                current_node = current_node.next_node
-            current_node.next_node = new_node
-            new_node.prev_node = current_node
-            self.head = new_node
+            new_node = Node(data)
+
+            if self.head is None:
+                self.head = new_node
+            else:
+                current_node = self.head
+                while current_node.next_node:
+                    current_node = current_node.next_node
+                current_node.next_node = new_node
+                new_node.prev_node = current_node
+                self.head = new_node
 
     def build_list_from_dictionary(self, previous_nodes: dict):
         nodes_references: dict = {}
