@@ -42,14 +42,14 @@ def test_linked_list_find(linked_list):
     assert node.data == "node3"
 
 
-def test_linked_list_get_following_node(linked_list):
-    node = linked_list.get_following_node("node3")
+def test_linked_list_next(linked_list):
+    node = linked_list.next("node3")
     assert node.data == "node4"
 
 
-def test_linked_list_get_previous_node(linked_list):
-    node = linked_list.get_previous_node("node3")
-    assert node == "node2"
+def test_linked_list_previous(linked_list):
+    node = linked_list.previous("node3")
+    assert node.data == "node2"
 
 
 def test_linked_list_get_empty_sublist(linked_list):
@@ -78,16 +78,3 @@ def test_linked_list_build_list_from_dictionary():
     ll = LinkedList()
     ll.build_list_from_dictionary(previous_nodes)
     assert ll.get_head().data == "node5"
-
-def test_linked_list_next(linked_list):
-    """Test the next() method of the LinkedList."""
-    current_node = linked_list.find("node3")
-    next_node = linked_list.next(current_node)
-    assert next_node.data == "node4"
-
-
-def test_linked_list_previous(linked_list):
-    """Test the previous() method of the LinkedList."""
-    current_node = linked_list.find("node3")
-    previous_node = linked_list.previous(current_node)
-    assert previous_node.data == "node2"

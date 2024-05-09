@@ -6,8 +6,7 @@ from migrations.migration import Migration
 migration_blueprint = Blueprint('migration', __name__, cli_group=None)
 migration_manager = Migration()
 
-# Define CLI commands with help strings
-@migration_blueprint.cli.command("migrate", default="new_migration", help="The name of the migration")
+@migration_blueprint.cli.command("migrate", help="The name of the migration")
 @click.argument('migration_name')
 def migrate(migration_name):
     """

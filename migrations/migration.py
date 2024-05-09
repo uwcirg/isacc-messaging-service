@@ -189,7 +189,7 @@ class Migration:
 
     def get_previous_migration(self, current_migration) -> str:
         """Retrieve the previous migration."""
-        return self.migration_sequence.get_previous_node(current_migration)
+        return self.migration_sequence.previous(current_migration)
 
     def get_latest_created_migration(self) -> str:
         """Retrieve the latest migration in the entire migration sequence."""

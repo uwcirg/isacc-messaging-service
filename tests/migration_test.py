@@ -19,7 +19,7 @@ def test_build_migration_sequence_empty(migration_instance):
         assert migration_instance.migration_sequence.get_head() is None
 
 def test_build_migration_sequence_with_dependencies(migration_instance, mock_get_previous_migration_id):
-    mock_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
+    mock_filenames = ['migration1', 'migration2', 'migration3']
     with patch.object(Migration, 'get_migrations', return_value=mock_filenames):
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
@@ -38,7 +38,7 @@ def test_get_previous_migration_id_nonexistent_file(migration_instance):
     assert down_revision is None
 
 def test_build_migration_sequence_with_circular_dependency(migration_instance, mock_get_previous_migration_id):
-    mock_filenames = ['migration1.py', 'migration2.py', 'migration3.py']
+    mock_filenames = ['migration1', 'migration2', 'migration3']
     with patch.object(Migration, 'get_migrations', return_value=mock_filenames):
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',
@@ -56,7 +56,7 @@ def test_get_migrations(migration_instance):
 
 def test_get_previous_migration_id_empty(migration_instance):
     filename = "test_7c929f8e-bd11-4283-9603-40613839d23a"
-    mock_file_content = {f"{filename}.py": ""}
+    mock_file_content = {f"{filename}": ""}
     with patch("builtins.open", mock_open(read_data=lambda f: mock_file_content[f])):
         prev_migration_id = migration_instance.get_previous_migration_id(filename)
     assert prev_migration_id is None
@@ -73,7 +73,7 @@ def test_get_previous_migration(migration_instance):
 def test_get_previous_migration_id_exists(migration_instance):
     migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
     migration_content = "down_revision = 'migration122'\n"
-    mock_file_content = {f"{migration}.py": migration_content}
+    mock_file_content = {f"{migration}": migration_content}
     with patch("builtins.open", mock_open(read_data=lambda f: mock_file_content[f])):
         down_revision = migration_instance.get_previous_migration_id(migration)
     assert down_revision == "migration122"
