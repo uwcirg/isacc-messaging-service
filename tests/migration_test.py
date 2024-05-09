@@ -82,13 +82,18 @@ def test_get_previous_migration_id_exists(migration_instance):
     migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
     migration_content = "down_revision = 'migration122'\n"
     mock_file_content = {f"{migration}.py": migration_content}
-    
-    with patch("builtins.open", mock_open()) as mock_file:
-        # Configure the mock to return the appropriate content based on the filename
-        mock_file.side_effect = lambda f: mock_file_content[f.name]
 
+    # Define a custom mock_open function to return the appropriate content
+    def mock_open_func(filename, mode):
+        if filename in mock_file_content:
+            return mock_open(read_data=mock_file_content[filename]).return_value
+        else:
+            raise FileNotFoundError(f"No such file or directory: '{filename}'")
+
+    # Patch the built-in open function with the custom mock_open function
+    with patch("builtins.open", mock_open_func):
         # Call the method being tested
         prev_migration_id = migration_instance.get_previous_migration_id(migration)
-    
+
     # Perform assertion
     assert prev_migration_id == 'migration122'
