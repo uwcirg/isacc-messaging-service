@@ -65,7 +65,16 @@ class Migration:
 
     def get_previous_migration_id(self, migration_id: str) -> str:
         """Retrieve the down_revision from a migration script."""
-        filename = self.migrations_locations[migration_id] + ".py"
+        try:
+            filename = self.migrations_locations[migration_id] + ".py"
+        except KeyError as e:
+            message = f"No corresponding file found for migration {migration_id}"
+            audit_entry(
+                message,
+                level='error'
+            )
+            raise e
+
         down_revision = None
         migration_path = os.path.join(self.migrations_dir, filename)
         if os.path.exists(migration_path):

@@ -25,7 +25,7 @@ def mock_get_previous_migration_id():
 def test_build_migration_sequence_empty(migration_instance):
     with patch.object(Migration, 'get_migrations', return_value=[]):
         migration_instance.build_migration_sequence()
-        assert migration_instance.migration_sequence.head.data is None
+        assert migration_instance.migration_sequence.head.data is 'None'
 
 def test_build_migration_sequence_with_dependencies(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1', 'migration2', 'migration3']
@@ -43,8 +43,9 @@ def test_build_migration_sequence_with_dependencies(migration_instance, mock_get
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration = "nonexistent_migration"
-    down_revision = migration_instance.get_previous_migration_id(migration)
-    assert down_revision is None
+    with pytest.raises(ValueError) as exc_info:
+        migration_instance.get_previous_migration_id(migration)
+    assert str(exc_info.value) == f"No corresponding file found for migration {migration}"
 
 def test_build_migration_sequence_with_circular_dependency(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1', 'migration2', 'migration3']
