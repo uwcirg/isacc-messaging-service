@@ -73,7 +73,7 @@ class Migration:
                 message,
                 level='error'
             )
-            raise e
+            raise ValueError(message)
 
         down_revision = None
         migration_path = os.path.join(self.migrations_dir, filename)

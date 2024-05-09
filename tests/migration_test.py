@@ -38,7 +38,7 @@ def test_build_migration_sequence_with_dependencies(migration_instance, mock_get
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration = "nonexistent_migration"
-    with pytest.raises(KeyError) as exc_info:
+    with pytest.raises(ValueError) as exc_info:
         migration_instance.get_previous_migration_id(migration)
     assert str(exc_info.value) == f"No corresponding file found for migration {migration}"
 
