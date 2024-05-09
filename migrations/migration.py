@@ -91,6 +91,16 @@ class Migration:
     def generate_migration_script(self, migration_name: str):
         """Generate a new migration script."""
         self.build_migration_sequence()
+        if migration_name in self.migrations_locations.values():
+            error_message = f"That name already exist. Use a new name for the migration"
+
+            audit_entry(
+                error_message,
+                level='error'
+            )
+
+            raise ValueError(error_message)
+
         current_migration_id = str(self.get_latest_applied_migration_from_fhir())
         latest_created_migration_id = str(self.get_latest_created_migration())
 
@@ -102,7 +112,7 @@ class Migration:
                 level='error'
             )
 
-            raise ValueError(error_message)
+            raise RuntimeError(error_message)
 
         new_id = str(uuid.uuid4())
         migration_filename = f"{migration_name}.py"
