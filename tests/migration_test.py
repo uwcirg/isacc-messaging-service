@@ -68,7 +68,7 @@ def test_get_previous_migration(migration_instance):
 def test_get_previous_migration_id_empty(migration_instance):
     migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
     mock_file_content = {f"{migration}.py": "None"}
-    with patch("builtins.open", mock_open(read_data=mock_file_content[migration])):
+    with patch("builtins.open", mock_open(read_data=mock_file_content[migration + '.py'])):
         prev_migration_id = migration_instance.get_previous_migration_id(migration)
     
     assert prev_migration_id is "None"
@@ -77,7 +77,7 @@ def test_get_previous_migration_id_exists(migration_instance):
     migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
     migration_content = "down_revision = 'migration122'\n"
     mock_file_content = {f"{migration}.py": migration_content}
-    with patch("builtins.open", mock_open(read_data=mock_file_content[migration])):
+    with patch("builtins.open", mock_open(read_data=mock_file_content[migration+ '.py'])):
         down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision == "migration122"
