@@ -78,35 +78,20 @@ def test_get_previous_migration_id_empty(migration_instance):
     # Perform assertion
     assert prev_migration_id is None
 
-@fixture
-def mock_open_file(monkeypatch):
-    mock_content = {}
+def test_get_previous_migration_id_exists(migration_instance, monkeypatch):
+    migration_id = "test_8c929f8e-bd11-4283-9603-40613839d23a"
+    filename = f"{migration_id}.py"
+    expected_down_revision = "migration122"
+    migration_content = f"down_revision = '{expected_down_revision}'\n"
 
-    # Define a mock open function
-    def mock_open(filename, mode='r'):
-        if filename in mock_content:
-            return mock_content[filename]
+    # Patch the open function to return the mock content
+    def mock_open(filepath, *args, **kwargs):
+        if filepath == filename:
+            return migration_content
         else:
-            raise FileNotFoundError(f"No such file or directory: '{filename}'")
+            raise FileNotFoundError
 
-    # Patch the built-in open function with the mock open function
     monkeypatch.setattr("builtins.open", mock_open)
+    prev_migration_id = migration_instance.get_previous_migration_id(migration_id)
 
-    # Function to add content to the mock file
-    def add_mock_file_content(filename, content):
-        mock_content[filename] = content
-
-    return add_mock_file_content
-
-def test_get_previous_migration_id_exists(migration_instance, mock_open_file):
-    migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
-    migration_content = "down_revision = 'migration122'\n"
-
-    # Add mock file content using the fixture
-    mock_open_file(f"{migration}.py", migration_content)
-
-    # Call the method being tested
-    prev_migration_id = migration_instance.get_previous_migration_id(migration)
-
-    # Perform assertion
-    assert prev_migration_id == 'migration122'
+    assert prev_migration_id == expected_down_revision
