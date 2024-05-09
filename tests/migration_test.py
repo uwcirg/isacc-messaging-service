@@ -88,7 +88,13 @@ def test_get_previous_migration_id_exists(migration_instance):
     mock_module = MockMigrationModule()
     
     # Patch the imp.load_source function to return the mock module
-    with patch("migrations.migration.imp.load_source", return_value=mock_module):
+    with patch("migrations.migration.imp.load_source", return_value=mock_module), \
+         patch("migrations.migration.getattr") as mock_getattr:
+        
+        # Set the return value of getattr to the down_revision attribute of the mock module
+        mock_getattr.return_value = mock_module.down_revision
+        
+        # Call the method being tested
         down_revision = migration_instance.get_previous_migration_id(migration)
 
     assert down_revision == 'migration122'
