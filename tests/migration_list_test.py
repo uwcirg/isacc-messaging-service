@@ -53,7 +53,7 @@ def test_linked_list_previous(linked_list):
 
 
 def test_linked_list_get_empty_sublist(linked_list):
-    sublist = linked_list.get_sublist(linked_list.get_head().data)
+    sublist = linked_list.get_sublist(linked_list.head.data)
     assert len(sublist) == 0
 
 
@@ -64,7 +64,7 @@ def test_linked_list_get_sublist(linked_list):
 
 def test_linked_list_add(linked_list):
     linked_list.add("node6")
-    assert linked_list.get_head().data == "node6"
+    assert linked_list.head.data == "node6"
 
 
 def test_linked_list_build_list_from_dictionary():
@@ -77,4 +77,4 @@ def test_linked_list_build_list_from_dictionary():
     }
     ll = LinkedList()
     ll.build_list_from_dictionary(previous_nodes)
-    assert ll.get_head().data == "node5"
+    assert ll.head.data == "node5"

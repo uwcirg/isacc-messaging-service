@@ -1,23 +1,48 @@
 class Node:
     def __init__(self, data):
         """Initialize a node with data."""
-        self.data = data
-        self.prev_node = None
-        self.next_node = None
+        self._data = data
+        self._prev_node = None
+        self._next_node = None
+
+    @property
+    def data(self):
+        """Get the data of the node."""
+        return self._data
+
+    @property
+    def prev_node(self):
+        """Get the previous node."""
+        return self._prev_node
+
+    @prev_node.setter
+    def prev_node(self, node):
+        """Set the previous node."""
+        self._prev_node = node
+
+    @property
+    def next_node(self):
+        """Get the next node."""
+        return self._next_node
+
+    @next_node.setter
+    def next_node(self, node):
+        """Set the next node."""
+        self._next_node = node
 
     def __repr__(self):
         """Representation of the node."""
-        return f"{self.data}"
+        return f"{self._data}"
 
     def __eq__(self, other):
         """Check equality of nodes."""
         if isinstance(other, Node):
-            return self.data == other.data
+            return self._data == other.data
         return False
 
     def __hash__(self):
         """Hash the node's data."""
-        return hash(self.data)
+        return hash(self._data)
 
 
 class LinkedList:
@@ -131,6 +156,12 @@ class LinkedList:
             error_message = "Cycle detected in the list"
             raise ValueError(error_message)
 
-    def get_head(self):
-        """Get the head node."""
-        return self.head
+    @property
+    def head(self):
+        """Get the head of the linked list."""
+        return self._head
+
+    @head.setter
+    def head(self, node):
+        """Set the head of the linked list."""
+        self._head = node

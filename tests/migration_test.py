@@ -16,7 +16,7 @@ def mock_get_previous_migration_id():
 def test_build_migration_sequence_empty(migration_instance):
     with patch.object(Migration, 'get_migrations', return_value=[]):
         migration_instance.build_migration_sequence()
-        assert migration_instance.migration_sequence.get_head() is None
+        assert migration_instance.migration_sequence.head is None
 
 def test_build_migration_sequence_with_dependencies(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1', 'migration2', 'migration3']
@@ -27,10 +27,10 @@ def test_build_migration_sequence_with_dependencies(migration_instance, mock_get
             'migration1': 'None'
         }.get
         migration_instance.build_migration_sequence()
-        assert migration_instance.migration_sequence.get_head().data == 'migration3'
-        assert migration_instance.migration_sequence.get_head().prev_node.data == 'migration2'
-        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.data == 'migration1'
-        assert migration_instance.migration_sequence.get_head().prev_node.prev_node.prev_node is None
+        assert migration_instance.migration_sequence.head.data == 'migration3'
+        assert migration_instance.migration_sequence.head.prev_node.data == 'migration2'
+        assert migration_instance.migration_sequence.head.prev_node.prev_node.data == 'migration1'
+        assert migration_instance.migration_sequence.head.prev_node.prev_node.prev_node is None
 
 def test_get_previous_migration_id_nonexistent_file(migration_instance):
     migration = "nonexistent_migration"

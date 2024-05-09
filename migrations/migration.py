@@ -193,7 +193,7 @@ class Migration:
 
     def get_latest_created_migration(self) -> str:
         """Retrieve the latest migration in the entire migration sequence."""
-        return self.migration_sequence.get_head()
+        return self.migration_sequence.head
 
     ## FHIR MANAGEMENT LOGIC
     def get_latest_applied_migration_from_fhir(self) -> str:
