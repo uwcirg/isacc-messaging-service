@@ -78,22 +78,17 @@ def test_get_previous_migration_id_empty(migration_instance):
     # Perform assertion
     assert prev_migration_id is None
 
-def test_get_previous_migration_id_exists(migration_instance, monkeypatch):
-    migration_id = "test_8c929f8e-bd11-4283-9603-40613839d23a"
-    filename = f"{migration_id}.py"
-    expected_down_revision = "migration122"
-    migration_content = f"down_revision = '{expected_down_revision}'\n"
+class MockMigrationModule:
+    down_revision = 'migration122'
 
-    # Patch the open function to return the mock content
-    def mock_open(filepath, *args, **kwargs):
-        print("filepath",filepath)
-        print("filename",filename)
-        if filepath == filename:
-            return migration_content
-        else:
-            raise FileNotFoundError
+def test_get_previous_migration_id_exists(migration_instance):
+    migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
+    
+    # Create a mock module object
+    mock_module = MockMigrationModule()
+    
+    # Patch the imp.load_source function to return the mock module
+    with patch("imp.load_source", return_value=mock_module):
+        down_revision = migration_instance.get_previous_migration_id(migration)
 
-    monkeypatch.setattr("builtins.open", mock_open)
-    prev_migration_id = migration_instance.get_previous_migration_id(migration_id)
-
-    assert prev_migration_id == expected_down_revision
+    assert down_revision == 'migration122'
