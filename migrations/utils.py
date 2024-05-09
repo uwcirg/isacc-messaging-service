@@ -45,8 +45,12 @@ class LinkedList:
 
     def next(self, current_node_data) -> object:
         """Retrieve data following the specified one."""
-        return self.next_node(current_node_data).data
-      
+        node = self.next_node(current_node_data)
+        if node:
+            return node.data
+        else:
+            return None
+
     def previous_node(self, current_node_data) -> Node:
         """Retrieve node before the specified one."""
         current_node = self.find(current_node_data)
@@ -56,7 +60,11 @@ class LinkedList:
     
     def previous(self, current_node_data) -> object:
         """Retrieve data before the specified one."""
-        return self.previous_node(current_node_data).data
+        node = self.previous_node(current_node_data)
+        if node:
+            return node.data
+        else:
+            return None
     
     def get_sublist(self, first_node_data: str, last_node_data: str = None) -> list:
         """Return a list consistings of nodes between the specified boundaries.
