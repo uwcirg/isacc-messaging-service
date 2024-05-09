@@ -67,7 +67,7 @@ class Migration:
         """Retrieve the down_revision from a migration script."""
         try:
             filename = self.migrations_locations[migration_id] + ".py"
-        except ValueError as e:
+        except KeyError as e:
             message = f"No corresponding file found for migration {migration_id}"
             audit_entry(
                 message,
