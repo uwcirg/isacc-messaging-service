@@ -43,13 +43,13 @@ def test_linked_list_find(linked_list):
 
 
 def test_linked_list_next(linked_list):
-    node = linked_list.next("node3")
-    assert node.data == "node4"
+    next = linked_list.next("node3")
+    assert next == "node4"
 
 
 def test_linked_list_previous(linked_list):
-    node = linked_list.previous("node3")
-    assert node.data == "node2"
+    previous = linked_list.previous("node3")
+    assert previous == "node2"
 
 
 def test_linked_list_get_empty_sublist(linked_list):

@@ -54,12 +54,6 @@ def test_get_migrations(migration_instance):
     migration_files = migration_instance.get_migrations()
     assert isinstance(migration_files, list)
 
-def test_get_previous_migration_id_empty(migration_instance):
-    filename = "test_7c929f8e-bd11-4283-9603-40613839d23a"
-    mock_file_content = {f"{filename}": ""}
-    with patch("builtins.open", mock_open(read_data=lambda f: mock_file_content[f])):
-        prev_migration_id = migration_instance.get_previous_migration_id(filename)
-    assert prev_migration_id is None
 
 def test_run_migrations_invalid_direction(migration_instance):
     with pytest.raises(ValueError):
@@ -70,10 +64,20 @@ def test_get_previous_migration(migration_instance):
     previous_migration = migration_instance.get_previous_migration(current_migration)
     assert previous_migration is None
 
+
+def test_get_previous_migration_id_empty(migration_instance):
+    filename = "test_7c929f8e-bd11-4283-9603-40613839d23a"
+    mock_file_content = {f"{filename}.py": ""}
+    with patch("builtins.open", mock_open(read_data=mock_file_content[filename + ".py"])):
+        prev_migration_id = migration_instance.get_previous_migration_id(filename)
+    
+    assert prev_migration_id is None
+
 def test_get_previous_migration_id_exists(migration_instance):
     migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
     migration_content = "down_revision = 'migration122'\n"
-    mock_file_content = {f"{migration}": migration_content}
-    with patch("builtins.open", mock_open(read_data=lambda f: mock_file_content[f])):
+    mock_file_content = {f"{migration}.py": migration_content}
+    with patch("builtins.open", mock_open(read_data=mock_file_content[migration + ".py"])):
         down_revision = migration_instance.get_previous_migration_id(migration)
+
     assert down_revision == "migration122"
