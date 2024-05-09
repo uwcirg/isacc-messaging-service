@@ -92,6 +92,6 @@ def test_get_previous_migration_id_exists(migration_instance, monkeypatch):
             raise FileNotFoundError
 
     monkeypatch.setattr("builtins.open", mock_open)
-    prev_migration_id = migration_instance.get_previous_migration_id(migration_id)
+    prev_migration_id = migration_instance.get_previous_migration_id(filename)
 
     assert prev_migration_id == expected_down_revision
