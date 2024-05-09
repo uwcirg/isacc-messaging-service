@@ -23,6 +23,7 @@ class Migration:
             migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
         self.migrations_dir = migrations_dir
         self.migration_sequence = LinkedList()
+        self.migrations_locations = {}
         self.build_migration_sequence()
 
     def build_migration_sequence(self):
@@ -54,16 +55,17 @@ class Migration:
             module_name = os.path.splitext(file_name)[0]
             try:
                 migration_module = imp.load_source(module_name, file_path)
-                revision = getattr(migration_module, "revision", None)
+                revision = str(getattr(migration_module, "revision", None))
                 if revision:
-                    revisions.append(str(revision))
+                    revisions.append(revision)
+                    self.migrations_locations[revision] = module_name
             except Exception as e:
                 print(f"Error loading migration script {file_name}: {e}")
         return revisions
 
     def get_previous_migration_id(self, migration_id: str) -> str:
         """Retrieve the down_revision from a migration script."""
-        filename = migration_id + ".py"
+        filename = self.migrations_locations[migration_id] + ".py"
         down_revision = None
         migration_path = os.path.join(self.migrations_dir, filename)
         if os.path.exists(migration_path):
@@ -103,7 +105,7 @@ class Migration:
             raise ValueError(error_message)
 
         new_id = str(uuid.uuid4())
-        migration_filename = f"{new_id}.py"
+        migration_filename = f"{migration_name}.py"
         migration_path = os.path.join(self.migrations_dir, migration_filename)
 
         with open(migration_path, "w") as migration_file:
@@ -161,7 +163,7 @@ class Migration:
     def run_migration(self, direction: str, next_migration: str, applied_migration: str):
         """Run single migration based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
-        migration_path = os.path.join(self.migrations_dir, next_migration + ".py")
+        migration_path = os.path.join(self.migrations_dir, self.migrations_locations[next_migration] + ".py")
         try:
             audit_entry(
                 "running migration",
