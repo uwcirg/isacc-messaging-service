@@ -86,12 +86,14 @@ def test_get_previous_migration_id_exists(migration_instance, monkeypatch):
 
     # Patch the open function to return the mock content
     def mock_open(filepath, *args, **kwargs):
+        print("filepath",filepath)
+        print("filename",filename)
         if filepath == filename:
             return migration_content
         else:
             raise FileNotFoundError
 
     monkeypatch.setattr("builtins.open", mock_open)
-    prev_migration_id = migration_instance.get_previous_migration_id(filename)
+    prev_migration_id = migration_instance.get_previous_migration_id(migration_id)
 
     assert prev_migration_id == expected_down_revision
