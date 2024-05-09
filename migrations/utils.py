@@ -48,11 +48,11 @@ class Node:
 class LinkedList:
     def __init__(self):
         """Initialize a linked list."""        
-        self.head = None
+        self._head = None
 
     def find(self, data) -> Node:
         """Find the first node containing the specified data."""
-        current_node = self.head
+        current_node = self._head
         while current_node:
             if current_node.data == data:
                 return current_node
@@ -61,7 +61,7 @@ class LinkedList:
 
     def next_node(self, current_node_data) -> Node:
         """Retrieve node following the specified one."""
-        next_node = self.head
+        next_node = self._head
         while next_node and next_node.prev_node:
             if next_node.prev_node.data == current_node_data:
                 return next_node
@@ -96,7 +96,7 @@ class LinkedList:
         Inclusive of last endpoint, not of first."""
         unapplied_migrations = []
         if last_node_data is None:
-            last_node = self.head
+            last_node = self._head
         else:
             last_node = self.find(last_node_data)
 
@@ -118,15 +118,15 @@ class LinkedList:
         else:
             new_node = Node(data)
 
-            if self.head is None:
-                self.head = new_node
+            if self._head is None:
+                self._head = new_node
             else:
-                current_node = self.head
+                current_node = self._head
                 while current_node.next_node:
                     current_node = current_node.next_node
                 current_node.next_node = new_node
                 new_node.prev_node = current_node
-                self.head = new_node
+                self._head = new_node
 
     def build_list_from_dictionary(self, previous_nodes: dict):
         '''Creates a sorted LinkedList where head is the latest created migration in the directory.
@@ -148,11 +148,11 @@ class LinkedList:
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in nodes_references.values():
             if node.next_node is None:
-                self.head = node
+                self._head = node
                 break
 
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
-        if self.head == None:
+        if self._head == None:
             error_message = "Cycle detected in the list"
             raise ValueError(error_message)
 

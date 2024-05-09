@@ -6,7 +6,16 @@ from pytest import fixture
 
 @fixture
 def migration_instance():
-    return Migration()
+    # Create a Migration instance
+    migration = Migration()
+    # Populate migrations_locations manually for testing purposes
+    migration.migrations_locations = {
+        'migration1_file': None,
+        'migration2_file': 'migration2',
+        'migration3_file': 'migration3'
+    }
+
+    return migration
 
 @fixture
 def mock_get_previous_migration_id():
@@ -16,7 +25,7 @@ def mock_get_previous_migration_id():
 def test_build_migration_sequence_empty(migration_instance):
     with patch.object(Migration, 'get_migrations', return_value=[]):
         migration_instance.build_migration_sequence()
-        assert migration_instance.migration_sequence.head is None
+        assert migration_instance.migration_sequence.head.data is None
 
 def test_build_migration_sequence_with_dependencies(migration_instance, mock_get_previous_migration_id):
     mock_filenames = ['migration1', 'migration2', 'migration3']
@@ -60,12 +69,12 @@ def test_run_migrations_invalid_direction(migration_instance):
         migration_instance.run_migrations(direction="invalid_direction")
 
 def test_get_previous_migration(migration_instance):
-    current_migration = "current_migration"
+    current_migration = "migration1_file"
     previous_migration = migration_instance.get_previous_migration(current_migration)
     assert previous_migration is None
 
 def test_get_previous_migration_id_empty(migration_instance):
-    migration = "test_8c929f8e-bd11-4283-9603-40613839d23a"
+    migration = "migration2_file"
     mock_file_content = {f"{migration}.py": ""}
     
     with patch("builtins.open", mock_open()) as mock_file:
