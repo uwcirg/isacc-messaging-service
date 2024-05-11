@@ -1,3 +1,8 @@
+"""Migration flask commands
+
+Defines number of commands relevant for creating and managing migrations.
+"""
+
 from flask import Blueprint
 import click
 
@@ -6,11 +11,11 @@ from migrations.migration import Migration
 migration_blueprint = Blueprint('migration', __name__, cli_group=None)
 migration_manager = Migration()
 
-@migration_blueprint.cli.command("migrate", help="The name of the migration")
+@migration_blueprint.cli.command("migrate", help="The name of the migration file to create")
 @click.argument('migration_name')
 def migrate(migration_name):
     """
-    Generate a new migration script.
+    Generate a new migration script in python.
     """
     migration_manager.generate_migration_script(migration_name)
 

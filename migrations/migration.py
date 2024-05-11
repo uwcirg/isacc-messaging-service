@@ -1,24 +1,36 @@
 """Migration Module
 
-Captures common methods needed by the system for migration
+Captures common methods needed by the system for migration.
+
+When downgrading, the downgrade() function of the currently
+applied migration is being run. Downgrade goes 1 step back.
+When upgrading, the upgrade() function of the to-be-applied
+migration is being run. Upgrade applies all unapplied migrations.
+
+If cycle is present in the migration order, the error is raised,
+and manual resolution is necessary.
+
+In order to create a new migration, all existing migrations must
+first be applied.
+
+You cannot create mpre than one new migration file at a time.
+
+For branching/conflict resolution, manually review the migration files.
 """
 
 import os
-from typing import List
-from datetime import datetime
 import uuid
 import imp
 
 from migrations.migration_resource import MigrationManager
-from migrations.utils import Node, LinkedList
+from migrations.utils import LinkedList
 from isacc_messaging.audit import audit_entry
-from isacc_messaging.models.fhir import (
-    first_in_bundle,
-)
 
 
 class Migration:
     def __init__(self, migrations_dir=None):
+        '''Initializes Migration class, which contains the logic
+        for managing the migration order'''
         if migrations_dir is None:
             migrations_dir = os.path.join(os.path.dirname(__file__), "versions")
         self.migrations_dir = migrations_dir
@@ -27,6 +39,8 @@ class Migration:
         self.build_migration_sequence()
 
     def build_migration_sequence(self):
+        '''Builds the migration list, based on the double LInked List.
+        Checks for cycles'''
         migration_files: list = self.get_migrations()
         migration_nodes: dict = {}
 
@@ -46,6 +60,7 @@ class Migration:
 
 
     def get_migrations(self) -> list:
+        '''Retrieves all valid   migrations from the files in the migration directory.'''
         migration_files = os.listdir(self.migrations_dir)
         python_files = [file for file in migration_files if file.endswith(".py")]
 
@@ -59,12 +74,13 @@ class Migration:
                 if revision:
                     revisions.append(revision)
                     self.migrations_locations[revision] = module_name
-            except Exception as e:
-                print(f"Error loading migration script {file_name}: {e}")
+            except KeyError as e:
+                print(f"Error loading migration script {module_name}: {e}")
         return revisions
 
     def get_previous_migration_id(self, migration_id: str) -> str:
-        """Retrieve the down_revision from a migration script."""
+        """Retrieve the down_revision from a migration script.
+        Revision variables are used to track the migration order."""
         try:
             filename = self.migrations_locations[migration_id] + ".py"
         except KeyError as e:
@@ -98,7 +114,7 @@ class Migration:
         return down_revision
 
     def generate_migration_script(self, migration_name: str):
-        """Generate a new migration script."""
+        """Generate a new migration script with basic functions."""
         self.build_migration_sequence()
         if migration_name in self.migrations_locations.values():
             error_message = f"That name already exist. Use a new name for the migration"
@@ -169,7 +185,8 @@ class Migration:
             unapplied_migrations = current_migration
 
         if not unapplied_migrations or unapplied_migrations == 'None':
-            raise ValueError("No valid migration files to run.")
+            # If no migrations are left to run, silently exit
+            return
 
         if direction == "upgrade":
             # Run all available migrations
@@ -180,7 +197,7 @@ class Migration:
             self.run_migration(direction, unapplied_migrations, applied_migrations)
 
     def run_migration(self, direction: str, next_migration: str, applied_migration: str):
-        """Run single migration based on the specified direction ("upgrade" or "downgrade")."""
+        """Run migration(s) based on the specified direction ("upgrade" or "downgrade")."""
         # Update the migration to acquire most recent updates in the system
         migration_path = os.path.join(self.migrations_dir, self.migrations_locations[next_migration] + ".py")
         try:
@@ -205,7 +222,7 @@ class Migration:
             )
 
     def get_unapplied_migrations(self, applied_migration) -> list:
-        """Retrieve all migrations after the applied migration."""
+        """Retrieve all migrations that have not yet been ran."""
         return self.migration_sequence.get_sublist(applied_migration)
 
     def get_previous_migration(self, current_migration) -> str:
@@ -213,52 +230,21 @@ class Migration:
         return self.migration_sequence.previous(current_migration)
 
     def get_latest_created_migration(self) -> str:
-        """Retrieve the latest migration in the entire migration sequence."""
+        """Retrieve the latest created migration."""
         return self.migration_sequence.head
 
     ## FHIR MANAGEMENT LOGIC
     def get_latest_applied_migration_from_fhir(self) -> str:
         """Retrieve the latest applied migration migration id from FHIR."""
         # Logic to retrieve the latest applied migration number from FHIR
-        basic = MigrationManager.get_resource()
-        basic = first_in_bundle(basic)
-
-        if basic is None:
+        manager = MigrationManager.get_resource(create_if_not_found=False)
+        if manager is None:
             return None
 
-        manager = MigrationManager(basic)
-        latest_applied_migration = manager.get_latest_migration()
-
-        return latest_applied_migration
+        return manager.get_latest_migration()
 
     def update_latest_applied_migration_in_fhir(self, latest_applied_migration: str):
         """Update the latest applied migration id in FHIR."""
         # Logic to update the latest applied migration number in FHIR
-        basic = MigrationManager.get_resource()
-        basic = first_in_bundle(basic)
-
-        if basic is None:
-            basic = self.create_applied_migration_manager(latest_applied_migration)
-
-        manager = MigrationManager(basic)
+        manager = MigrationManager.get_resource(create_if_not_found=True)
         manager.update_migration(latest_applied_migration)
-
-
-    def create_applied_migration_manager(self, initial_applied_migration: str = None):
-        """Create new FHIR resource to keep track of Migration History."""
-        message = "No Migration History for this repository. Initializing new Migration Manager"
-
-        audit_entry(
-            message,
-            level='info'
-        )
-
-        # Logic to create new Basic resource keeping track of the migration
-        created_time = datetime.now().astimezone().isoformat()
-        m = {
-            'resourceType': 'Basic',
-            'code': {"coding": [{ "system": "http://our.migration.system", "code": initial_applied_migration}]},
-            'created': created_time,
-        }
-
-        return MigrationManager.create_resource(resource=m)

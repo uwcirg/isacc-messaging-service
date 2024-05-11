@@ -1,58 +1,44 @@
+"""Double Linked-List
+
+Defines a specialized doubly linked list implementation restricted to unique data 
+values and no cycles to prevent migration conflicts. Holds no cycles and raises
+errors when duplicate values are attempted to be added. Is intended to be re-build
+each time new migration is added to the migrations directory. 
+
+Self.head is always pointing to the latest created migration id, tail is pointing
+to the first created migration (the migration with no preceding migration).
+Hence, primary iterates backwards and adds forward.
+"""
 class Node:
     def __init__(self, data):
-        """Initialize a node with data."""
-        self._data = data
-        self._prev_node = None
-        self._next_node = None
-
-    @property
-    def data(self):
-        """Get the data of the node."""
-        return self._data
-
-    @property
-    def prev_node(self):
-        """Get the previous node."""
-        return self._prev_node
-
-    @prev_node.setter
-    def prev_node(self, node):
-        """Set the previous node."""
-        self._prev_node = node
-
-    @property
-    def next_node(self):
-        """Get the next node."""
-        return self._next_node
-
-    @next_node.setter
-    def next_node(self, node):
-        """Set the next node."""
-        self._next_node = node
+        """Initialize a node with two connections containing data."""
+        self.data = data
+        self.prev_node = None
+        self.next_node = None
 
     def __repr__(self):
         """Representation of the node."""
-        return f"{self._data}"
+        return f"{self.data}"
 
     def __eq__(self, other):
         """Check equality of nodes."""
         if isinstance(other, Node):
-            return self._data == other.data
+            return self.data == other.data
         return False
 
     def __hash__(self):
         """Hash the node's data."""
-        return hash(self._data)
+        return hash(self.data)
 
 
 class LinkedList:
     def __init__(self):
         """Initialize a linked list."""        
-        self._head = None
+        self.head = None
 
     def find(self, data) -> Node:
-        """Find the first node containing the specified data."""
-        current_node = self._head
+        """Find the first node containing specified data."""
+        current_node = self.head
         while current_node:
             if current_node.data == data:
                 return current_node
@@ -60,8 +46,8 @@ class LinkedList:
         return None
 
     def next_node(self, current_node_data) -> Node:
-        """Retrieve node following the specified one."""
-        next_node = self._head
+        """Retrieve node after the specified one."""
+        next_node = self.head
         while next_node and next_node.prev_node:
             if next_node.prev_node.data == current_node_data:
                 return next_node
@@ -69,7 +55,7 @@ class LinkedList:
         return None
 
     def next(self, current_node_data) -> object:
-        """Retrieve data following the specified one."""
+        """Retrieve data from the node after the specified one."""
         node = self.next_node(current_node_data)
         if node:
             return node.data
@@ -84,7 +70,7 @@ class LinkedList:
         return None
     
     def previous(self, current_node_data) -> object:
-        """Retrieve data before the specified one."""
+        """Retrieve data from the node before the specified one."""
         node = self.previous_node(current_node_data)
         if node:
             return node.data
@@ -92,11 +78,11 @@ class LinkedList:
             return None
     
     def get_sublist(self, first_node_data: str, last_node_data: str = None) -> list:
-        """Return a list consistings of nodes between the specified boundaries.
-        Inclusive of last endpoint, not of first."""
+        """Return a list consisting of nodes between the specified boundaries.
+        Inclusive of last endpoint, but not of first."""
         unapplied_migrations = []
         if last_node_data is None:
-            last_node = self._head
+            last_node = self.head
         else:
             last_node = self.find(last_node_data)
 
@@ -111,22 +97,20 @@ class LinkedList:
         return unapplied_migrations
 
     def add(self, data):
-        """Add new node after the head. Raises an error if node with such migration already exists."""
+        """Add new node after the head, updating the head.
+        Raises an error if node with such migration already exists in the list."""
         new_node = self.find(data)
         if new_node:
             raise ValueError("adding a duplicate item")
-        else:
-            new_node = Node(data)
+        new_node = Node(data)
 
-            if self._head is None:
-                self._head = new_node
-            else:
-                current_node = self._head
-                while current_node.next_node:
-                    current_node = current_node.next_node
-                current_node.next_node = new_node
-                new_node.prev_node = current_node
-                self._head = new_node
+        if self.head is None:
+            self.head = new_node
+        else:
+            current_node = self.head
+            current_node.next_node = new_node
+            new_node.prev_node = current_node
+            self.head = new_node
 
     def build_list_from_dictionary(self, previous_nodes: dict):
         '''Creates a sorted LinkedList where head is the latest created migration in the directory.
@@ -148,20 +132,11 @@ class LinkedList:
         # Find the migration node that has no 'next_node' (i.e., the tail node)
         for node in nodes_references.values():
             if node.next_node is None:
-                self._head = node
+                self.head = node
                 break
 
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
-        if self._head == None:
+        if self.head == None:
             error_message = "Cycle detected in the list"
             raise ValueError(error_message)
 
-    @property
-    def head(self):
-        """Get the head of the linked list."""
-        return self._head
-
-    @head.setter
-    def head(self, node):
-        """Set the head of the linked list."""
-        self._head = node
