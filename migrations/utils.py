@@ -136,7 +136,7 @@ class LinkedList:
                 break
 
         # Assess whether there are any inconsistencies
-        self.check_dictionary_consistency()
+        self.check_dictionary_consistency(nodes_references)
 
     def check_dictionary_consistency(self, nodes_references: dict):
         '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
