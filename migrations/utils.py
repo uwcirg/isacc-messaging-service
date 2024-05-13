@@ -135,8 +135,27 @@ class LinkedList:
                 self.head = node
                 break
 
+        # Assess whether there are any inconsistencies
+        self.check_dictionary_consistency()
+
+    def check_dictionary_consistency(self, nodes_references: dict):
+        '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
+        prev and next node references'''
+        
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
         if self.head == None:
             error_message = "Cycle detected in the list"
             raise ValueError(error_message)
 
+        tail_count = 0
+
+        for node in nodes_references.values():
+            if node.next_node is None and node != self.head:
+                raise ValueError(f"Consistency error: find a node without a next reference that is not the head")
+            elif node.prev_node is None:
+                tail_count += 1
+
+        if tail_count != 1:
+            raise ValueError(f"Consistency error: Expected exactly one tail node, found {tail_count}")
+
+        return True
