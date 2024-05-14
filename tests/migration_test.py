@@ -43,7 +43,7 @@ def test_get_previous_migration_id_nonexistent_file(migration_instance):
     assert str(exc_info.value) == f"No corresponding file found for migration {migration}"
 
 def test_build_migration_sequence_with_circular_dependency(migration_instance, mock_get_previous_migration_id):
-    mock_filenames = ['migration1', 'migration2', 'migration3']
+    mock_filenames = ['migration1', 'migration2', 'migration3', 'migration4']
     with patch.object(Migration, 'get_migrations', return_value=mock_filenames):
         mock_get_previous_migration_id.side_effect = {
             'migration2': 'migration1',

@@ -59,7 +59,7 @@ class Migration:
 
 
     def get_migrations(self) -> list:
-        '''Retrieves all valid   migrations from the files in the migration directory.'''
+        '''Retrieves all valid migrations from the files in the migration directory.'''
         migration_files = os.listdir(self.migrations_dir)
         python_files = [file for file in migration_files if file.endswith(".py")]
 

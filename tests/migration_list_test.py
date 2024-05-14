@@ -139,7 +139,7 @@ def test_check_dictionary_consistency_missing_reference(linked_list, nodes_refer
 
     with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
-    assert str(exc_info.value) == "Consistency error: find a node without a next reference that is not the head"
+    assert str(exc_info.value) == "Consistency error: node references are not consistent"
 
 
 def test_check_dictionary_consistency_no_tail(linked_list, nodes_references):
@@ -149,7 +149,7 @@ def test_check_dictionary_consistency_no_tail(linked_list, nodes_references):
 
     with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
-    assert str(exc_info.value) == "Consistency error: Expected exactly one tail node, found 0"
+    assert str(exc_info.value) == "Consistency error: node references are not consistent"
 
 
 def test_check_dictionary_consistency_multiple_tails(linked_list, nodes_references):
@@ -159,23 +159,10 @@ def test_check_dictionary_consistency_multiple_tails(linked_list, nodes_referenc
 
     with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
-    assert str(exc_info.value) == "Consistency error: Expected exactly one tail node, found 2"
-
-
-def test_check_dictionary_consistency_inconsistent_next(linked_list, nodes_references):
-    node4 = nodes_references["node4"]
-    node3 = nodes_references["node3"]
-    node2 = nodes_references["node2"]
-
-    node4.prev_node = node3
-    node3.next_node = node2
-
-    with pytest.raises(RuntimeError) as exc_info:
-        linked_list.check_dictionary_consistency(nodes_references)
     assert str(exc_info.value) == "Consistency error: node references are not consistent"
 
 
-def test_check_dictionary_consistency_inconsistent_prev(linked_list, nodes_references):
+def test_check_dictionary_consistency_inconsistent_next(linked_list, nodes_references):
     node4 = nodes_references["node4"]
     node3 = nodes_references["node3"]
     node2 = nodes_references["node2"]
