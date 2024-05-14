@@ -198,11 +198,8 @@ class LinkedList:
                     if next_node.prev_node != node:
                         raise RuntimeError(f"Consistency error: node references are not consistent")
                 if node.prev_node:
-                    next_node = self.find(node.prev_node.data)
-                    print(node)
-                    print(nodes_references)
-                    print(next_node.prev_node)
-                    if next_node.prev_node != node:
+                    prev_node = self.find(node.prev_node.data)
+                    if prev_node.next_node != node:
                         raise RuntimeError(f"Consistency error: node references are not consistent")
 
             if tail_count != 1:
