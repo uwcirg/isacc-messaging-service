@@ -148,7 +148,7 @@ class LinkedList:
         self.check_consistency()
 
     def check_consistency(self):
-        '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
+        '''Iterates from the head to check whether all of the nodes were rightly assigned 
         prev and next node references'''
         
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
@@ -199,6 +199,9 @@ class LinkedList:
                         raise RuntimeError(f"Consistency error: node references are not consistent")
                 if node.prev_node:
                     next_node = self.find(node.prev_node.data)
+                    print(node)
+                    print(nodes_references)
+                    print(next_node.prev_node)
                     if next_node.prev_node != node:
                         raise RuntimeError(f"Consistency error: node references are not consistent")
 
