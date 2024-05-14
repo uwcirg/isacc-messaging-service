@@ -92,8 +92,44 @@ def test_linked_list_build_list_from_dictionary():
     assert ll.head.data == "node5"
 
 
+def test_check_consistency_valid(linked_list):
+    """Test consistency check with a valid linked list"""
+    assert linked_list.check_consistency()
+
+
+def test_check_consistency_cycle(linked_list):
+    """Test consistency check when head is None"""
+    linked_list.head.next_node = linked_list.head.prev_node.prev_node
+    with pytest.raises(RuntimeError, match="Cycle detected in the sequence"):
+        linked_list.check_consistency()
+
+
+def test_check_consistency_no_next_reference(linked_list):
+    """Test consistency check when a node has no next reference and is not the head"""
+    linked_list.head.prev_node.prev_node.next_node = None
+    with pytest.raises(RuntimeError, match="Consistency error: find a node without a next reference that is not the head"):
+        linked_list.check_consistency()
+
+
+def test_check_consistency_inconsistent_references(linked_list):
+    """Test consistency check when node references are not consistent"""
+    linked_list.head.prev_node.prev_node.next_node = linked_list.head
+    with pytest.raises(RuntimeError, match="Consistency error: node references are not consistent"):
+        linked_list.check_consistency()
+
+
 def test_check_dictionary_consistency_valid(linked_list, nodes_references):
     assert linked_list.check_dictionary_consistency(nodes_references)
+
+
+def test_check_dictionary_consistency_cycle(linked_list, nodes_references):
+    node1 = nodes_references["node1"]
+
+    linked_list.head.next_node = node1  # Creating a cycle
+
+    with pytest.raises(RuntimeError) as exc_info:
+        linked_list.check_dictionary_consistency(nodes_references)
+    assert str(exc_info.value) == "Cycle detected in the list"
 
 
 def test_check_dictionary_consistency_missing_reference(linked_list, nodes_references):
@@ -101,7 +137,7 @@ def test_check_dictionary_consistency_missing_reference(linked_list, nodes_refer
 
     node3.next_node = None  # Missing next reference
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
     assert str(exc_info.value) == "Consistency error: find a node without a next reference that is not the head"
 
@@ -111,7 +147,7 @@ def test_check_dictionary_consistency_no_tail(linked_list, nodes_references):
 
     node1.prev_node = linked_list.head  # Removing the tail
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
     assert str(exc_info.value) == "Consistency error: Expected exactly one tail node, found 0"
 
@@ -121,6 +157,32 @@ def test_check_dictionary_consistency_multiple_tails(linked_list, nodes_referenc
 
     node4.prev_node = None  # Adding another tail
 
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(RuntimeError) as exc_info:
         linked_list.check_dictionary_consistency(nodes_references)
     assert str(exc_info.value) == "Consistency error: Expected exactly one tail node, found 2"
+
+
+def test_check_dictionary_consistency_inconsistent_next(linked_list, nodes_references):
+    node4 = nodes_references["node4"]
+    node3 = nodes_references["node3"]
+    node2 = nodes_references["node2"]
+
+    node4.prev_node = node3
+    node3.next_node = node2
+
+    with pytest.raises(RuntimeError) as exc_info:
+        linked_list.check_dictionary_consistency(nodes_references)
+    assert str(exc_info.value) == "Consistency error: node references are not consistent"
+
+
+def test_check_dictionary_consistency_inconsistent_prev(linked_list, nodes_references):
+    node4 = nodes_references["node4"]
+    node3 = nodes_references["node3"]
+    node2 = nodes_references["node2"]
+
+    node4.prev_node = node3
+    node3.next_node = node2
+
+    with pytest.raises(RuntimeError) as exc_info:
+        linked_list.check_dictionary_consistency(nodes_references)
+    assert str(exc_info.value) == "Consistency error: node references are not consistent"

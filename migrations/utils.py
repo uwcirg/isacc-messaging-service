@@ -45,6 +45,15 @@ class LinkedList:
             current_node = current_node.prev_node
         return None
 
+    def present(self, data) -> bool:
+        """Find whether specific data is present in the list."""
+        current_node = self.head
+        while current_node:
+            if current_node.data == data:
+                return True
+            current_node = current_node.prev_node
+        return False
+
     def next_node(self, current_node_data) -> Node:
         """Retrieve node after the specified one."""
         next_node = self.head
@@ -136,26 +145,64 @@ class LinkedList:
                 break
 
         # Assess whether there are any inconsistencies
-        self.check_dictionary_consistency(nodes_references)
+        self.check_consistency()
 
-    def check_dictionary_consistency(self, nodes_references: dict):
+    def check_consistency(self):
         '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
         prev and next node references'''
         
         # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
         if self.head == None:
-            error_message = "Cycle detected in the list"
-            raise ValueError(error_message)
+            error_message = "Cycle detected in the sequence"
+            raise RuntimeError(error_message)
 
-        tail_count = 0
+        node = self.head
 
-        for node in nodes_references.values():
+        while node:
             if node.next_node is None and node != self.head:
-                raise ValueError(f"Consistency error: find a node without a next reference that is not the head")
-            elif node.prev_node is None:
-                tail_count += 1
+                raise RuntimeError(f"Consistency error: find a node without a next reference that is not the head")
 
-        if tail_count != 1:
-            raise ValueError(f"Consistency error: Expected exactly one tail node, found {tail_count}")
+            # Check for inconsistent references
+            if node.next_node:
+                next_node = self.find(node.next_node.data)
+                if next_node.prev_node != node:
+                    raise RuntimeError("Consistency error: node references are not consistent")
+            if node.prev_node:
+                prev_node = self.find(node.prev_node.data)
+                if prev_node.next_node != node:
+                    raise RuntimeError("Consistency error: node references are not consistent")
+            node = node.prev_node
 
         return True
+
+    def check_dictionary_consistency(self, nodes_references: dict):
+            '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
+            prev and next node references'''
+            
+            # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
+            if self.head == None:
+                error_message = "Cycle detected in the list"
+                raise ValueError(error_message)
+
+            tail_count = 0
+
+            for node in nodes_references.values():
+                if node.next_node is None and node != self.head:
+                    raise RuntimeError(f"Consistency error: find a node without a next reference that is not the head")
+                elif node.prev_node is None:
+                    tail_count += 1
+
+                # Check for inconsistent references
+                if node.next_node:
+                    next_node = self.find(node.next_node.data)
+                    if next_node.prev_node != node:
+                        raise RuntimeError(f"Consistency error: node references are not consistent")
+                elif node.prev_node:
+                    next_node = self.find(node.next_node.data)
+                    if next_node.prev_node != node:
+                        raise RuntimeError(f"Consistency error: node references are not consistent")
+
+            if tail_count != 1:
+                raise RuntimeError(f"Consistency error: expected exactly one tail node, found {tail_count}")
+
+            return True

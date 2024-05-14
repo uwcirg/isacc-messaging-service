@@ -50,10 +50,9 @@ class Migration:
         if len(migration_files) > 0:
             try:
                 self.migration_sequence.build_list_from_dictionary(migration_nodes)
-            except:
-                error_message = "Cycle detected in migration sequence"
-                audit_entry(error_message, level='error')
-                raise ValueError(error_message)
+            except Exception as e:
+                audit_entry(f"{str(e)}", level='error')
+                raise e
         else:
             error_message = "No valid migration files."
             audit_entry(error_message, level='info')

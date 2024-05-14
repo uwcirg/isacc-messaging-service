@@ -51,9 +51,9 @@ def test_build_migration_sequence_with_circular_dependency(migration_instance, m
             'migration3': 'migration4',
             'migration4': 'migration2',
         }.get
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(RuntimeError) as exc_info:
             Migration()
-        assert str(exc_info.value) == "Cycle detected in migration sequence"
+        assert str(exc_info.value) == "Cycle detected in the sequence"
 
 def test_get_migrations(migration_instance):
     migration_files = migration_instance.get_migrations()
