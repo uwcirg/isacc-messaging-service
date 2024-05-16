@@ -156,6 +156,11 @@ class Migration:
             migration_file.write("    print('downgraded')\n")
             migration_file.write("\n")
 
+        audit_entry(
+            f"Generated new migration {migration_name}",
+            level='info'
+        )
+
         return migration_filename
 
     def run_migrations(self, direction: str):
