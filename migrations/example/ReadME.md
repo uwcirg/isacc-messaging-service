@@ -16,7 +16,7 @@ The Migration module provides methods to manage database migrations in a structu
 
 - Python >= 3.7
 - FHIR server (if using FHIR integration)
-- Required Python packages: `os`, `uuid`, `imp`, `json`, `logging`, `requests`, `logging`, 
+- Required Python packages: `os`, `uuid`, `imp`, `json`, `logging`, `requests`, `datetime`, `fhir libraries`  
 
 ## Installation
 
@@ -26,7 +26,7 @@ The Migration module provides methods to manage database migrations in a structu
    git clone https://your-repository-url.git
    cd your-repository-directory
 
-1. Install the requirements.txt:
+2. Install the requirements.txt:
 
    `pip install -r requirements.txt`
 
@@ -35,7 +35,6 @@ The Migration module provides methods to manage database migrations in a structu
 To initialize the Migration service and use a specific directory for migration scripts, you need to provide the path to the directory when creating an instance of the Migration class. By default, the service looks for migration scripts in the versions directory located in the same directory as the script.  
 
 <pre>
-
 import os  
 from your_module import Migration  
 
@@ -66,10 +65,12 @@ your_project/
 │       └── 0002_add_field_to_table.py  
 
 ## Example
+
 Provided is a simple migration script that creates a test patient and then modifies it. The operation was limited to one patient to limit potential interference with existing stores. However, the commands used in the examples can be expanded to any number of examples and were limited for the sake of demonstration.  
 The generated migration script will contain basic functions for upgrading and downgrading together with migration ids.  
 More example can be found in versions subdirectory.  
 
+Sample migration:  
 <pre>
 # Migration script generated for example_migration
 revision = 'your-unique-revision-id'
@@ -92,4 +93,5 @@ def downgrade():
 - Upgrade upgrades up to and including latest created migration, downgrade downgrades one migrations at a time. 
 
 ## Liscence
-This project is licensed under the MIT License - see the LICENSE file for details.
+
+This project is licensed under the MIT License - see the LICENSE file for details.  

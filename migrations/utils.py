@@ -95,7 +95,7 @@ class LinkedList:
         else:
             last_node = self.find(last_node_data)
 
-        # Iterate over migrations starting from top
+        # Iterate over migrations starting from the latest migration
         while last_node and last_node.data != first_node_data:
             unapplied_migrations.append(last_node.data)
             last_node = last_node.prev_node

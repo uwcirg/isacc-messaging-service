@@ -19,6 +19,7 @@ HEADERS = {
 }
 
 def upgrade():
+    # Defines upgrading function ran on upgrade command
     response = requests.get(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS)
     if response.status_code == 200:
         patient_resource = response.json()
@@ -38,6 +39,7 @@ def upgrade():
         logging.error(f'Failed to retrieve patient for updating: {response.status_code} {response.text}')
 
 def downgrade():
+    # Defines downgrading function ran on downgrade command
     response = requests.get(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS)
     if response.status_code == 200:
         patient_resource = response.json()
