@@ -7,7 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from isacc_messaging.api import views
 from isacc_messaging.audit import audit_entry, audit_log_init
 from isacc_messaging.extensions import oauth
-from migrations import views as migration_views
+from migrations import commands as migration_commands
 
 
 def create_app(testing=False, cli=False):
@@ -59,7 +59,7 @@ def register_blueprints(app):
     """register all blueprints for application
     """
     app.register_blueprint(views.base_blueprint)
-    app.register_blueprint(migration_views.migration_blueprint)
+    app.register_blueprint(migration_commands.migration_blueprint)
 
 
 def configure_proxy(app):

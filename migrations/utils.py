@@ -36,6 +36,15 @@ class LinkedList:
         """Initialize a linked list."""        
         self.head = None
 
+    def __contains__(self, data):
+        """Find whether specific data is present in the list."""
+        current_node = self.head
+        while current_node:
+            if current_node.data == data:
+                return True
+            current_node = current_node.prev_node
+        return False
+
     def find(self, data) -> Node:
         """Find the first node containing specified data."""
         current_node = self.head
@@ -44,15 +53,6 @@ class LinkedList:
                 return current_node
             current_node = current_node.prev_node
         return None
-
-    def present(self, data) -> bool:
-        """Find whether specific data is present in the list."""
-        current_node = self.head
-        while current_node:
-            if current_node.data == data:
-                return True
-            current_node = current_node.prev_node
-        return False
 
     def next_node(self, current_node_data) -> Node:
         """Retrieve node after the specified one."""
@@ -151,7 +151,7 @@ class LinkedList:
         '''Iterates from the head to check whether all of the nodes were rightly assigned 
         prev and next node references'''
         
-        # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
+        # If no tail node exists and length is not zero, means there is a circular dependency, no outgoing edges
         if self.head == None:
             error_message = "Cycle detected in the sequence"
             raise RuntimeError(error_message)
@@ -179,7 +179,7 @@ class LinkedList:
             '''Iterates over the dictionary to check whether all of the nodes were rightly assigned 
             prev and next node references'''
             
-            # If no tail node exists and length is not zero, means there is a circual dependency, no outgoing edges
+            # If no tail node exists and length is not zero, means there is a circular dependency, no outgoing edges
             if self.head == None:
                 error_message = "Cycle detected in the list"
                 raise ValueError(error_message)

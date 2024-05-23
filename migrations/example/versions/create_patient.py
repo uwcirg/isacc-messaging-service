@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import os
 
 # Migration script generated for add_active
 revision = '985f4e1e-29f5-4911-bc9c-2c774b685289'
@@ -10,7 +11,7 @@ down_revision = 'None'
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Define the FHIR server base URL
-FHIR_SERVER_URL = 'http://localhost:8080/fhir'
+FHIR_SERVER_URL = os.getenv('FHIR_URL')
 PATIENT_ID = 'example'
 
 # Headers for FHIR requests

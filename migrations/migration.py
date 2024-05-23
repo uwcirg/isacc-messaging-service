@@ -13,7 +13,7 @@ and manual resolution is necessary.
 In order to create a new migration, all existing migrations must
 first be applied.
 
-You cannot create mpre than one new migration file at a time.
+You cannot create more than one new migration file at a time.
 
 For branching/conflict resolution, manually review the migration files.
 """
@@ -67,14 +67,11 @@ class Migration:
         for file_name in python_files:
             file_path = os.path.join(self.migrations_dir, file_name)
             module_name = os.path.splitext(file_name)[0]
-            try:
-                migration_module = imp.load_source(module_name, file_path)
-                revision = str(getattr(migration_module, "revision", None))
-                if revision:
-                    revisions.append(revision)
-                    self.migrations_locations[revision] = module_name
-            except KeyError as e:
-                print(f"Error loading migration script {module_name}: {e}")
+            migration_module = imp.load_source(module_name, file_path)
+            revision = str(getattr(migration_module, "revision", None))
+            if revision:
+                revisions.append(revision)
+                self.migrations_locations[revision] = module_name
         return revisions
 
     def get_previous_migration_id(self, migration_id: str) -> str:
@@ -129,7 +126,7 @@ class Migration:
         latest_created_migration_id = str(self.get_latest_created_migration())
 
         if current_migration_id != latest_created_migration_id:
-            error_message = f"There exists an unapplied migration."
+            error_message = f"There exists not applied migration."
 
             audit_entry(
                 error_message,
@@ -252,3 +249,19 @@ class Migration:
         # Logic to update the latest applied migration number in FHIR
         manager = MigrationManager.get_resource(create_if_not_found=True)
         manager.update_migration(latest_applied_migration)
+
+    def create(self):
+        # Logic to update the latest applied migration number in FHIR
+        MigrationManager.create_new_resource()
+
+    def get(self):
+        # Logic to update the latest applied migration number in FHIR
+        MigrationManager.get_new_resource()
+
+    def create_hapi(self):
+        # Logic to update the latest applied migration number in FHIR
+        MigrationManager.create_resource_hapi()
+
+    def get_hapi(self):
+        # Logic to update the latest applied migration number in FHIR
+        MigrationManager.get_resource_hapi()
