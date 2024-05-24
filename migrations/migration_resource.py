@@ -24,7 +24,7 @@ class MigrationManager(Basic):
     @staticmethod
     def create_resource(resource=None) -> 'MigrationManager':
         """Create a new Migration Manager storing the latest applied migration id"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "1235")
+        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "1237")
 
         if resource is None:
             # Define the resource data
@@ -53,11 +53,32 @@ class MigrationManager(Basic):
 
         return new_manager
 
+
+    @staticmethod
+    def get_resource(create_if_not_found=True, params=None) -> 'MigrationManager':
+        """Search for the Migration Manager. If specified, create one when not found"""
+        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
+        response = HAPI_request('GET', 'Basic', params={
+            "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
+        })
+        basic = first_in_bundle(response)
+        print("result of GET, ", response)
+        if basic is None and create_if_not_found:
+            print("Creating new resource")
+            return MigrationManager.persist()
+        elif basic is None and not create_if_not_found:
+            return None
+
+        manager = MigrationManager(basic)
+
+        return manager
+
+
     @staticmethod
     def create_new_resource():
         # Define the FHIR server URL and the identifier
         fhir_url = 'http://fhir-internal:8080/fhir/Basic'
-        identifier = 'http://isacc.app/twilio-message-sid|1235'
+        identifier = 'http://fhir.migration.system|1235'
         resource_id = '1235'
 
         # Define the resource data
@@ -65,7 +86,7 @@ class MigrationManager(Basic):
             "resourceType": "Basic",
             "identifier": [
                 {
-                    "system": "http://isacc.app/twilio-message-sid",
+                    "system": "http://fhir.migration.system",
                     "value": resource_id
                 }
             ],
@@ -102,7 +123,7 @@ class MigrationManager(Basic):
     def get_new_resource():
         # GET request to retrieve the resource
         fhir_url = 'http://fhir-internal:8080/fhir/Basic'
-        identifier = 'http://isacc.app/twilio-message-sid|1235'
+        identifier = 'http://fhir.migration.system|1235'
         headers = {
             'Content-Type': 'application/fhir+json'
         }
@@ -139,7 +160,7 @@ class MigrationManager(Basic):
             "resourceType": "Basic",
             "identifier": [
                 {
-                    "system": "http://isacc.app/twilio-message-sid",
+                    "system": "http://fhir.migration.system",
                     "value": MIGRATION_RESOURCE_ID
                 }
             ],
@@ -168,7 +189,26 @@ class MigrationManager(Basic):
     @staticmethod
     def persist(resource = None):
         """Persist Basic state to FHIR store"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1235)
+        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
+        if not resource:
+            resource = {
+                "resourceType": "Basic",
+                "identifier": [
+                    {
+                        "system": "http://fhir.migration.system",
+                        "value": MIGRATION_RESOURCE_ID
+                    }
+                ],
+                "code": {
+                    "coding": [
+                        {
+                            "system": "http://our.migration.system",
+                            "code": "updated-code"
+                        }
+                    ]
+                },
+                "created": datetime.now().astimezone().isoformat()
+            }
 
         response = HAPI_request(
             method="PUT",
@@ -177,7 +217,9 @@ class MigrationManager(Basic):
             params={
             "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
         })
+        print("Result of HAPI_request PUT ", response)
         return response
+
 
     def update_migration(self, migration_id: str):
         """Update the migration id on the FHIR"""
