@@ -261,6 +261,26 @@ def update_patient_active():
         )
 
 
+@base_blueprint.cli.command("test-put")
+def test_put():
+    import requests
+    import http.client as http_client
+    http_client.HTTPConnection.debuglevel = 1
+    # You must initialize logging, otherwise you'll not see debug output.
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.DEBUG)
+    requests_log = logging.getLogger("requests.packages.urllib3")
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+
+    j = {"resourceType": "Basic", "identifier": [{"system": "http://fhir.migration.system", "value": 1225}], "code": {"coding": [{"system": "http://our.migration.system", "code": "updated-code"}]}, "created": "2024-05-20T01:08:47.539048+00:00"}
+    x = 'https://fhir.pb.isacc.dev.cirg.uw.edu/fhir/Basic?identifier=http://fhir.migration.system%7C1225'
+    u = 'https://fhir.pb.isacc.dev.cirg.uw.edu/fhir/Basic'
+    p = {'identifier': "http://fhir.migration.system|1225"}
+
+    resp = requests.put(u, params=p, json=j)
+    logging.debug(f"URL {resp.url}")
+
 @base_blueprint.cli.command("maintenance-add-telecom-period-start-all-patients")
 def update_patient_telecom():
     """Iterate through patients, add telecom start period to all of them"""
