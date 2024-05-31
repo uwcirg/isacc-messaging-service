@@ -8,13 +8,24 @@ from datetime import datetime
 import os
 from fhirclient.models.basic import Basic
 from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
-from isacc_messaging.models.fhir import first_in_bundle, HAPI_request
+from isacc_messaging.models.fhir import first_in_bundle
 import requests
 import json
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+fhir_url = 'http://fhir-internal:8080/fhir/'
+MIGRATION_SYSTEM = "http://fhir.migration.system"
+MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "1236")
+
 
 class MigrationManager(Basic):
     """Represents a FHIR resource for managing migrations."""
+    search_params = {"identifier": f'{MIGRATION_SYSTEM}|{MIGRATION_RESOURCE_ID}'}
+
     def __init__(self, jsondict=None, strict=True):
         super(Basic, self).__init__(jsondict=jsondict, strict=strict)
 
@@ -24,7 +35,6 @@ class MigrationManager(Basic):
     @staticmethod
     def create_resource(resource=None) -> 'MigrationManager':
         """Create a new Migration Manager storing the latest applied migration id"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "1237")
 
         if resource is None:
             # Define the resource data
@@ -32,7 +42,7 @@ class MigrationManager(Basic):
                 "resourceType": "Basic",
                 "identifier": [
                     {
-                        "system": "http://fhir.migration.system",
+                        "system": MIGRATION_SYSTEM,
                         "value": MIGRATION_RESOURCE_ID
                     }
                 ],
@@ -55,38 +65,32 @@ class MigrationManager(Basic):
 
 
     @staticmethod
-    def get_resource(create_if_not_found=True, params=None) -> 'MigrationManager':
+    def get_resource(create_if_not_found=True) -> 'MigrationManager':
         """Search for the Migration Manager. If specified, create one when not found"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
-        response = HAPI_request('GET', 'Basic', params={
-            "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
-        })
-        basic = first_in_bundle(response)
-        print("result of GET, ", response)
+        response = requests.get(
+            f'{fhir_url}Basic', params=MigrationManager.search_params)
+        response.raise_for_status()
+        basic = first_in_bundle(response.json())
+        logger.debug("result of GET, ", response.json())
         if basic is None and create_if_not_found:
-            print("Creating new resource")
+            logger.debug("Creating new resource")
             return MigrationManager.persist()
         elif basic is None and not create_if_not_found:
             return None
 
-        manager = MigrationManager(basic)
-
-        return manager
+        return MigrationManager(basic)
 
 
     @staticmethod
     def create_new_resource():
         # Define the FHIR server URL and the identifier
-        fhir_url = 'http://fhir-internal:8080/fhir/Basic'
-        identifier = 'http://fhir.migration.system|1235'
-        resource_id = '1235'
 
         # Define the resource data
         resource = {
             "resourceType": "Basic",
             "identifier": [
                 {
-                    "system": "http://fhir.migration.system",
+                    "system": MIGRATION_SYSTEM,
                     "value": resource_id
                 }
             ],
@@ -111,10 +115,12 @@ class MigrationManager(Basic):
 
         # PUT request to create or update the resource
         put_response = requests.put(
-            f"{fhir_url}?identifier={identifier}",
+            f"{fhir_url}Basic",
+            params=search_params,
             headers=headers,
             data=resource_json
         )
+        put_response.raise_for_status()
 
         print("PUT Response Status Code:", put_response.status_code)
         print("PUT Response Body:", put_response.json())
@@ -122,16 +128,16 @@ class MigrationManager(Basic):
     @staticmethod
     def get_new_resource():
         # GET request to retrieve the resource
-        fhir_url = 'http://fhir-internal:8080/fhir/Basic'
-        identifier = 'http://fhir.migration.system|1235'
         headers = {
             'Content-Type': 'application/fhir+json'
         }
 
         get_response = requests.get(
-            f"{fhir_url}?identifier={identifier}",
+            f"{fhir_url}Basic",
+            params=MigrationManager.search_params,
             headers=headers
         )
+        get_response.raise_for_status()
 
         print("GET Response Status Code:", get_response.status_code)
         print("GET Response Body:", get_response.json())
@@ -140,27 +146,24 @@ class MigrationManager(Basic):
     @staticmethod
     def get_resource_hapi() -> 'MigrationManager':
         """Search for the Migration Manager. If specified, create one when not found"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
-        response = HAPI_request('GET', 'Basic', params={
-            "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
-        })
-        basic = first_in_bundle(response)
+        response = requests.get(f"{fhir_url}Basic", params=MigrationManager.search_params)
+        response.raise_for_status()
+        basic = first_in_bundle(response.json())
 
         if basic is None:
-            print("HAPI_request did not find the Basic ", response)
+            print("HAPI_request did not find the Basic ", response.json())
         else:
-            print("HAPI_request Found Basic, reponse is ", response)
+            print("HAPI_request Found Basic, reponse is ", response.json())
 
 
     @staticmethod
     def create_resource_hapi(resource = None):
         """Persist Basic state to FHIR store"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
         resource = {
             "resourceType": "Basic",
             "identifier": [
                 {
-                    "system": "http://fhir.migration.system",
+                    "system": MIGRATION_SYSTEM,
                     "value": MIGRATION_RESOURCE_ID
                 }
             ],
@@ -175,27 +178,22 @@ class MigrationManager(Basic):
             "created": datetime.now().astimezone().isoformat()
         }
 
-        response = HAPI_request(
-            method="PUT",
-            resource_type='Basic',
-            resource=resource,
-            params={
-            "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
-        })
-        print("Result of HAPI_request PUT ", response)
-        return response
+        response = requests.put(
+            f"{fhir_url}Basic", json=resource, params=MigrationManager.search_params)
+        response.raise_for_status()
+        print("Result of HAPI_request PUT ", response.json())
+        return response.json()
 
 
     @staticmethod
     def persist(resource = None):
         """Persist Basic state to FHIR store"""
-        MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", 1236)
         if not resource:
             resource = {
                 "resourceType": "Basic",
                 "identifier": [
                     {
-                        "system": "http://fhir.migration.system",
+                        "system": MIGRATION_SYSTEM,
                         "value": MIGRATION_RESOURCE_ID
                     }
                 ],
@@ -210,14 +208,14 @@ class MigrationManager(Basic):
                 "created": datetime.now().astimezone().isoformat()
             }
 
-        response = HAPI_request(
-            method="PUT",
-            resource_type='Basic',
-            resource=resource,
-            params={
-            "identifier": f'http://fhir.migration.system|{MIGRATION_RESOURCE_ID}'
-        })
-        print("Result of HAPI_request PUT ", response)
+        logger.debug("attempt to PUT new Basic resource...")
+        response = requests.put(
+            f"{fhir_url}Basic",
+            json=resource,
+            params=MigrationManager.search_params,
+        )
+        response.raise_for_status()
+        logger.debug("Result of HAPI_request PUT ", response.json())
         return response
 
 
