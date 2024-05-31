@@ -84,6 +84,7 @@ def downgrade(basic_number):
     """
     Delete specific basic.
     """
+    raise NotImplementedError("this shouldn't be deleting our only Basic object, but rather rolling the value back to the down_revision")
     HEADERS = {
     'Content-Type': 'application/fhir+json'
     }
