@@ -63,11 +63,14 @@ class Migration:
 
     def get_migrations(self) -> list:
         '''Retrieves all valid migrations from the files in the migration directory.'''
-        migration_files = os.listdir(self.migrations_dir)
-        python_files = [file for file in migration_files if file.endswith(".py")]
+        try:
+            migration_files = os.listdir(self.migrations_dir)
+            migration_files = [file for file in migration_files if file.endswith('.py')]
+        except FileNotFoundError:
+            migration_files = []
 
         revisions = []
-        for file_name in python_files:
+        for file_name in migration_files:
             file_path = os.path.join(self.migrations_dir, file_name)
             module_name = os.path.splitext(file_name)[0]
             migration_module = imp.load_source(module_name, file_path)
