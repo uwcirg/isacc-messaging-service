@@ -50,8 +50,11 @@ class Migration:
         if len(migration_files) > 0:
             try:
                 self.migration_sequence.build_list_from_dictionary(migration_nodes)
+            except KeyError as ke:
+                audit_entry(f"Downrevision migration is missing in the sequence", level='error')
+                raise ke
             except Exception as e:
-                audit_entry(f"{str(e)}", level='error')
+                audit_entry(f"General exception encountered: {str(e)}", level='error')
                 raise e
         else:
             error_message = "No valid migration files."
@@ -68,10 +71,22 @@ class Migration:
             file_path = os.path.join(self.migrations_dir, file_name)
             module_name = os.path.splitext(file_name)[0]
             migration_module = imp.load_source(module_name, file_path)
-            revision = str(getattr(migration_module, "revision", None))
+
+            # Check for required attributes and methods
+            if not hasattr(migration_module, "revision"):
+                raise RuntimeError(f"Migration '{file_name}' is missing 'revision' variable.")
+            if not hasattr(migration_module, "down_revision"):
+                raise RuntimeError(f"Migration '{file_name}' is missing 'down_revision' variable.")
+            if not hasattr(migration_module, "upgrade") or not callable(getattr(migration_module, "upgrade")):
+                raise RuntimeError(f"Migration '{file_name}' is missing 'upgrade' method.")
+            if not hasattr(migration_module, "downgrade") or not callable(getattr(migration_module, "downgrade")):
+                raise RuntimeError(f"Migration '{file_name}' is missing 'downgrade' method.")
+
+            revision = str(getattr(migration_module, "revision"))
             if revision:
                 revisions.append(revision)
                 self.migrations_locations[revision] = module_name
+
         return revisions
 
     def get_previous_migration_id(self, migration_id: str) -> str:
@@ -238,7 +253,7 @@ class Migration:
     def get_latest_applied_migration_from_fhir(self) -> str:
         """Retrieve the latest applied migration migration id from FHIR."""
         # Logic to retrieve the latest applied migration number from FHIR
-        manager = MigrationManager.get_resource(create_if_not_found=False)
+        manager = MigrationManager.get_manager(create_if_not_found=False)
         if manager is None:
             return None
 
@@ -247,21 +262,5 @@ class Migration:
     def update_latest_applied_migration_in_fhir(self, latest_applied_migration: str):
         """Update the latest applied migration id in FHIR."""
         # Logic to update the latest applied migration number in FHIR
-        manager = MigrationManager.get_resource(create_if_not_found=True)
+        manager = MigrationManager.get_manager(create_if_not_found=True)
         manager.update_migration(latest_applied_migration)
-
-    def create(self):
-        # Logic to update the latest applied migration number in FHIR
-        MigrationManager.create_new_resource()
-
-    def get(self):
-        # Logic to update the latest applied migration number in FHIR
-        MigrationManager.get_new_resource()
-
-    def create_hapi(self):
-        # Logic to update the latest applied migration number in FHIR
-        MigrationManager.create_resource_hapi()
-
-    def get_hapi(self):
-        # Logic to update the latest applied migration number in FHIR
-        MigrationManager.get_resource_hapi()
