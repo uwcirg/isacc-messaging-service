@@ -1,23 +1,21 @@
 """Migration Resource
 
 Defines a FHIR resource holding data about the latest migration by specializing
-the `fhirclient.Basic` class. A single Basic resource is maintained with the most 
+the `fhirclient.Basic` class. A single Basic resource is maintained with the most
 recently (successfully) run migration revision held in the single Basic.code value.
 """
 import os
 import requests
 import json
 import logging
-from datetime import datetime
 from fhirclient.models.basic import Basic
-from isacc_messaging.models.isacc_fhirdate import IsaccFHIRDate as FHIRDate
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 fhir_url = os.getenv("FHIR_URL", 'http://fhir-internal:8080/fhir/')
 MIGRATION_SYSTEM = "http://fhir.migration.system"
-MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "1276")
+MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "8234")
 
 
 class MigrationManager(Basic):
@@ -26,6 +24,10 @@ class MigrationManager(Basic):
 
     def __init__(self, jsondict=None, strict=True):
         super(Basic, self).__init__(jsondict=jsondict, strict=strict)
+        # The extension class init does not define these fields as None
+        self.author = None
+        self.subject = None
+        self.created = None
 
     def __repr__(self):
         return f"{self.resource_type}/{self.id}"
@@ -47,7 +49,8 @@ class MigrationManager(Basic):
     def get_resource():
         # GET request to retrieve the resource
         headers = {
-            'Content-Type': 'application/fhir+json'
+            'Content-Type': 'application/fhir+json',
+            'Cache-Control': 'no-cache'
         }
 
         response = requests.get(
@@ -81,7 +84,6 @@ class MigrationManager(Basic):
                         }
                     ]
                 },
-                "created": datetime.now().astimezone().isoformat()
             }
         resource_json = json.dumps(resource)
         headers = {
@@ -101,11 +103,6 @@ class MigrationManager(Basic):
     def update_migration(self, migration_id: str):
         """Update the migration id on the FHIR"""
         self.code.coding[0].code = migration_id
-        self.created = FHIRDate(datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
-
-        # The extension class init does not define these fields as None
-        self.author = None
-        self.subject = None
 
         response = MigrationManager.persist(self.as_json())
         return response
