@@ -15,7 +15,7 @@ logger.setLevel(logging.DEBUG)
 
 fhir_url = os.getenv("FHIR_URL", 'http://fhir-internal:8080/fhir/')
 MIGRATION_SYSTEM = "http://fhir.migration.system"
-MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "8234")
+MIGRATION_RESOURCE_ID = os.getenv("MIGRATION_RESOURCE_ID", "e61c4580-2493-417f-a26c-26faa8eb70ba")
 
 
 class MigrationManager(Basic):
