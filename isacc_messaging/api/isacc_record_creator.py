@@ -67,7 +67,6 @@ class IsaccRecordCreator:
             if not patient.generalPractitioner:
                 practitioner=None
             else:
-
                 practitioner = resolve_reference(patient.generalPractitioner[0].reference)
             expanded_payload = expand_template_args(
                 content=cr.payload[0].contentString,
@@ -418,6 +417,6 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, cr: CommunicationRequest, successes: list):
+    def process_cr(self, cr: CommunicationRequest):
         status, statusReason = self.dispatch_cr(cr=cr)
         return status, statusReason
