@@ -1,4 +1,3 @@
-import os
 import pytest
 from unittest.mock import patch, mock_open
 from migrations.migration import Migration
