@@ -24,6 +24,12 @@ def upgrade():
     patient_resource = {
         "resourceType": "Patient",
         "id": PATIENT_ID,
+        "identifier": [
+            {
+                "system": "uwDAL_Clarity",
+                "value": "12345"
+            }
+        ],
         "name": [
             {
                 "use": "official",
@@ -37,7 +43,7 @@ def upgrade():
         "gender": "male",
         "birthDate": "1980-01-01"
     }
-    response = requests.put(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS, data=json.dumps(patient_resource))
+    response = requests.put(f'{FHIR_SERVER_URL}/Patient/examples', headers=HEADERS, data=json.dumps(patient_resource))
     if response.status_code == 200 or response.status_code == 201:
         logging.info('Patient created successfully.')
     else:
@@ -45,7 +51,7 @@ def upgrade():
 
 def downgrade():
     # Defines downgrading function ran on downgrade command
-    response = requests.delete(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS)
+    response = requests.delete(f'{FHIR_SERVER_URL}/Patient/examples', headers=HEADERS)
     if response.status_code == 200 or response.status_code == 204:
         logging.info('Patient deleted successfully.')
     else:

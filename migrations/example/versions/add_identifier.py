@@ -21,37 +21,53 @@ HEADERS = {
 
 def upgrade():
     # Defines upgrading function ran on upgrade command
-    response = requests.get(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS)
-    if response.status_code == 200:
-        patient_resource = response.json()
-        if 'identifier' not in patient_resource:
-            patient_resource['identifier'] = []
-        patient_resource['identifier'].append({
-            "use": "usual",
-            "system": "http://hospital.smarthealthit.org",
-            "value": "12345"
-        })
-        update_response = requests.put(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS, data=json.dumps(patient_resource))
-        if update_response.status_code == 200:
-            logging.info('Identifier appended successfully.')
-        else:
-            logging.error(f'Failed to append identifier: {update_response.status_code} {update_response.text}')
+    patient_resource = {
+        "resourceType": "Patient",
+        "id": PATIENT_ID,
+        "name": [
+            {
+                "use": "official",
+                "family": "Doe",
+                "given": [
+                    "John",
+                    "A"
+                ]
+            }
+        ],
+        "identifier": [
+            {
+                "system": "uwDAL_Clarity",
+                "value": "12345"
+            }
+        ],
+        "gender": "male",
+        "birthDate": "1980-01-01",
+        "telecom": [
+            {
+                "system": "phone",
+                "value": "555-555-5555",
+                "use": "home"
+            }
+        ]
+    }
+    response = requests.put(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS, data=json.dumps(patient_resource))
+    if response.status_code == 200 or response.status_code == 201:
+        logging.info('Patient updated successfully with phone number.')
     else:
-        logging.error(f'Failed to retrieve patient for updating: {response.status_code} {response.text}')
+        logging.error(f'Failed to update patient: {response.status_code} {response.text}')
 
 def downgrade():
     # Defines downgrading function ran on downgrade command
     response = requests.get(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS)
     if response.status_code == 200:
         patient_resource = response.json()
-        if 'identifier' in patient_resource:
-            patient_resource['identifier'] = [id for id in patient_resource['identifier'] if id['value'] != '12345']
-            update_response = requests.put(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS, data=json.dumps(patient_resource))
-            if update_response.status_code == 200:
-                logging.info('Identifier deleted successfully.')
-            else:
-                logging.error(f'Failed to delete identifier: {update_response.status_code} {update_response.text}')
+        # Remove the phone number if it exists
+        if 'telecom' in patient_resource:
+            patient_resource['telecom'] = [entry for entry in patient_resource['telecom'] if entry['system'] != 'phone' or entry['value'] != '555-555-5555']
+        response = requests.put(f'{FHIR_SERVER_URL}/Patient/{PATIENT_ID}', headers=HEADERS, data=json.dumps(patient_resource))
+        if response.status_code == 200 or response.status_code == 201:
+            logging.info('Patient phone number removed successfully.')
         else:
-            logging.info('No identifier to delete.')
+            logging.error(f'Failed to update patient: {response.status_code} {response.text}')
     else:
-        logging.error(f'Failed to retrieve patient for updating: {response.status_code} {response.text}')
+        logging.error(f'Failed to fetch patient: {response.status_code} {response.text}')
