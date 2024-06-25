@@ -20,8 +20,8 @@ class TestIsaccMessagingApp(unittest.TestCase):
         self.assertIsNotNone(self.app)
 
     def test_blueprints_registered(self):
-        self.assertIn('base_blueprint', self.app.blueprints)
-        self.assertIn('migration_blueprint', self.app.blueprints)
+        self.assertIn('base', self.app.blueprints)
+        self.assertIn('migration', self.app.blueprints)
 
 if __name__ == '__main__':
     unittest.main()
