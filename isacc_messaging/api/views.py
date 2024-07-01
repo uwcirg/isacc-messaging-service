@@ -11,7 +11,6 @@ from twilio.request_validator import RequestValidator
 
 base_blueprint = Blueprint('base', __name__, cli_group=None)
 
-
 @base_blueprint.route('/')
 def root():
     return {'ok': True}
@@ -302,3 +301,4 @@ def deactivate_patient(patient_id):
         f"Patient {patient_id} active set to false",
         level='info'
     )
+
