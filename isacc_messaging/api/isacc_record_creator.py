@@ -417,6 +417,6 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, cr: CommunicationRequest):
+    def process_cr(self, cr: CommunicationRequest, successes: list):
         status, statusReason = self.dispatch_cr(cr=cr)
         return status, statusReason
