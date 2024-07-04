@@ -385,7 +385,7 @@ class IsaccRecordCreator:
             try:
                 cr.status = "completed"
                 cr.persist()
-                comm_status, comm_statusReason = self.process_cr(cr, successes)
+                comm_status, comm_statusReason = self.process_cr(cr)
                 dispatched_comm = comm.change_status(status=comm_status)
                 audit_entry(
                     f"Updated status of Communication/{comm.id} to {comm_status}",
@@ -417,6 +417,6 @@ class IsaccRecordCreator:
 
         return successes, errors
 
-    def process_cr(self, cr: CommunicationRequest, successes: list):
+    def process_cr(self, cr: CommunicationRequest):
         status, statusReason = self.dispatch_cr(cr=cr)
         return status, statusReason
