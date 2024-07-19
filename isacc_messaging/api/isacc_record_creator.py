@@ -321,7 +321,7 @@ class IsaccRecordCreator:
                 level='info'
             )
 
-            score = int(response.json().get('score'))
+            score = response.json().get('score')
             if score == 1:
                 return "stat"
         except Exception as e:
