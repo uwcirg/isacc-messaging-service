@@ -301,4 +301,3 @@ def deactivate_patient(patient_id):
         f"Patient {patient_id} active set to false",
         level='info'
     )
-

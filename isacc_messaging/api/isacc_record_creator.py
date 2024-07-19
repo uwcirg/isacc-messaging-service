@@ -1,13 +1,14 @@
 from datetime import datetime, timedelta
+from flask import current_app
 import re
+import requests
 from typing import List, Tuple
+import json
 
 from fhirclient.models.communication import Communication
-from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
 from isacc_messaging.api.email_notifications import send_message_received_notification
-from isacc_messaging.api.ml_utils import predict_score
 from isacc_messaging.audit import audit_entry
 from isacc_messaging.models.fhir import (
     HAPI_request,
@@ -303,12 +304,24 @@ class IsaccRecordCreator:
         )
 
     def score_message(self, message):
-        model_path = current_app.config.get('TORCH_MODEL_PATH')
-        if not model_path:
+        # TODO: remove default value for production
+        ml_service_address = current_app.config.get('ML_SERVICE_ADDRESS', 'http://isaccml:8000')
+        if not ml_service_address:
             return "routine"
 
         try:
-            score = predict_score(message, model_path)
+            url = f'{ml_service_address}/predict_score'
+            headers = {'Content-Type': 'application/json'}
+            data = {'message': message}
+
+            response = requests.post(url, headers=headers, data=json.dumps(data))
+            response.raise_for_status()
+            audit_entry(
+                f"predict_score call response: {response.json()}",
+                level='info'
+            )
+
+            score = int(response.json().get('score'))
             if score == 1:
                 return "stat"
         except Exception as e:
