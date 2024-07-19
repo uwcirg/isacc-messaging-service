@@ -304,8 +304,7 @@ class IsaccRecordCreator:
         )
 
     def score_message(self, message):
-        # TODO: remove default value for production
-        ml_service_address = current_app.config.get('ML_SERVICE_ADDRESS', 'http://isaccml:8000')
+        ml_service_address = current_app.config.get('ML_SERVICE_ADDRESS')
         if not ml_service_address:
             return "routine"
 

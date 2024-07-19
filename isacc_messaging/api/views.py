@@ -155,8 +155,8 @@ def incoming_sms():
             level="error")
         return stackstr, 200
     if result is not None:
-        # Occurs when message is incoming from unknown phone 
-        # or request is coming from a subscribed phone number, but 
+        # Occurs when message is incoming from unknown phone
+        # or request is coming from a subscribed phone number, but
         # internal logic renders it invalid
         audit_entry(
             f"on_twilio_message_received generated error {result}",

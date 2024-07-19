@@ -40,4 +40,3 @@ MAIL_SUPPRESS_SEND = os.getenv("MAIL_SUPPRESS_SEND", 'false').lower() == 'true'
 ISACC_APP_URL = os.getenv("ISACC_APP_URL")
 EMAIL_PORT = os.getenv("EMAIL_PORT", 465)
 EMAIL_SERVER = os.getenv("EMAIL_SERVER", "smtp.gmail.com")
-
