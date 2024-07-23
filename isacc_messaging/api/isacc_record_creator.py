@@ -310,10 +310,7 @@ class IsaccRecordCreator:
 
         try:
             url = f'{ml_service_address}/predict_score'
-            headers = {'Content-Type': 'application/json'}
-            data = {'message': message}
-
-            response = requests.post(url, headers=headers, data=json.dumps(data))
+            response = requests.post(url, json={"message": message})
             response.raise_for_status()
             audit_entry(
                 f"predict_score call response: {response.json()}",
