@@ -4,54 +4,87 @@
 #
 #    pip-compile --output-file=requirements.txt setup.cfg
 #
+authlib==0.14.3
+    # via isacc_messaging (setup.cfg)
 cachelib==0.13.0
     # via flask-session
 certifi==2021.5.30
     # via requests
+cffi==1.14.1
+    # via cryptography
 charset-normalizer==2.0.6
     # via requests
 click==8.0.1
     # via flask
-flask==2.0.1
+cryptography==3.3.2
     # via
-    #   flask-jwt-extended
+    #   authlib
+    #   python-jose
+ecdsa==0.14.1
+    # via python-jose
+fhirclient==4.1.0
+    # via isacc_messaging (setup.cfg)
+flask==1.1.2
+    # via
+    #   flask-cors
     #   flask-session
-    #   patientsearch (setup.cfg)
-flask-jwt-extended==3.24.1
-    # via patientsearch (setup.cfg)
-flask-session==0.3.2
-    # via patientsearch (setup.cfg)
-future==1.0.0
-    # via redis-dict
-gunicorn==20.0.4
-    # via patientsearch (setup.cfg)
+    #   isacc_messaging (setup.cfg)
+flask-cors==4.0.1
+    # via isacc_messaging (setup.cfg)
+flask-session==0.4.1
+    # via isacc_messaging (setup.cfg)
+gunicorn==20.1.0
+    # via isacc_messaging (setup.cfg)
 idna==3.2
     # via requests
+isodate==0.6.1
+    # via fhirclient
 itsdangerous==2.0.1
-    # via flask
+    # via
+    #   flask
+    #   requests-cache
 jinja2==3.0.1
     # via flask
-jmespath==0.10.0
-    # via patientsearch (setup.cfg)
 markupsafe==2.0.1
     # via jinja2
-pyjwt==1.7.1
-    # via flask-jwt-extended
-python-json-logger==0.1.11
-    # via patientsearch (setup.cfg)
-redis==3.5.3
+pyasn1==0.4.8
     # via
-    #   patientsearch (setup.cfg)
-    #   redis-dict
-redis-dict==1.5.2
-    # via patientsearch (setup.cfg)
+    #   python-jose
+    #   rsa
+pycparser==2.20
+    # via cffi
+pyjwt==2.8.0
+    # via twilio
+python-jose[cryptography]==3.2.0
+    # via isacc_messaging (setup.cfg)
+python-json-logger==0.1.11
+    # via isacc_messaging (setup.cfg)
+pytz==2024.1
+    # via twilio
+redis==3.5.3
+    # via isacc_messaging (setup.cfg)
 requests==2.26.0
-    # via patientsearch (setup.cfg)
-six==1.15.0
-    # via flask-jwt-extended
+    # via
+    #   fhirclient
+    #   isacc_messaging (setup.cfg)
+    #   requests-cache
+    #   twilio
+requests-cache==0.6.4
+    # via isacc_messaging (setup.cfg)
+rsa==4.7
+    # via python-jose
+six==1.16.0
+    # via
+    #   cryptography
+    #   ecdsa
+    #   isodate
+    #   python-jose
+    #   url-normalize
+twilio==7.14.1
+    # via isacc_messaging (setup.cfg)
+url-normalize==1.4.3
+    # via requests-cache
 urllib3==1.26.7
     # via requests
 werkzeug==2.0.1
-    # via
-    #   flask
-    #   flask-jwt-extended
+    # via flask
