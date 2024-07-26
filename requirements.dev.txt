@@ -61,7 +61,7 @@ port-for==0.6.1
     # via pytest-redis
 psutil==5.8.0
     # via mirakuru
-py==1.10.0
+py==1.11.0
     # via pytest
 pyasn1==0.4.8
     # via
