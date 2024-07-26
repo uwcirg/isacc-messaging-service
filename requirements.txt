@@ -88,3 +88,4 @@ urllib3==1.26.7
     # via requests
 werkzeug==2.0.1
     # via flask
+git+https://github.com/uwcirg/fhir-migrations
