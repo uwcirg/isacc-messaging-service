@@ -83,4 +83,7 @@ urllib3==1.26.7
     # via requests
 werkzeug==2.0.1
     # via flask
+importlib-metadata==4.8.1  # via click
+typing-extensions==3.10.0.2  # via importlib-metadata
+zipp==3.5.0               # via importlib-metadata
 git+https://github.com/uwcirg/fhir-migrations
