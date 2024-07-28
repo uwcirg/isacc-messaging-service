@@ -4,53 +4,13 @@
 #
 #    pip-compile --extra=dev --output-file=requirements.dev.txt setup.cfg
 #
+--requirement requirements.txt
 attrs==21.2.0
     # via pytest
-authlib==0.14.3
-    # via isacc_messaging (setup.cfg)
 cachelib==0.13.0
     # via flask-session
-certifi==2021.5.30
-    # via requests
-cffi==1.14.1
-    # via cryptography
-charset-normalizer==2.0.6
-    # via requests
-click==8.0.1
-    # via flask
-cryptography==3.3.2
-    # via
-    #   authlib
-    #   python-jose
-ecdsa==0.14.1
-    # via python-jose
-fhirclient==4.1.0
-    # via isacc_messaging (setup.cfg)
-flask==1.1.2
-    # via
-    #   flask-cors
-    #   flask-session
-    #   isacc_messaging (setup.cfg)
-flask-cors==4.0.1
-    # via isacc_messaging (setup.cfg)
-flask-session==0.4.1
-    # via isacc_messaging (setup.cfg)
-gunicorn==20.1.0
-    # via isacc_messaging (setup.cfg)
-idna==3.2
-    # via requests
 iniconfig==1.1.1
     # via pytest
-isodate==0.6.1
-    # via fhirclient
-itsdangerous==2.0.1
-    # via
-    #   flask
-    #   requests-cache
-jinja2==3.0.1
-    # via flask
-markupsafe==2.0.1
-    # via jinja2
 mirakuru==2.4.1
     # via pytest-redis
 packaging==21.0
@@ -63,12 +23,6 @@ psutil==5.8.0
     # via mirakuru
 py==1.11.0
     # via pytest
-pyasn1==0.4.8
-    # via
-    #   python-jose
-    #   rsa
-pycparser==2.20
-    # via cffi
 pyjwt==2.8.0
     # via twilio
 pyparsing==2.4.7
@@ -84,37 +38,8 @@ pytest-redis==2.1.1
     # via isacc_messaging (setup.cfg)
 pytest-datadir==1.3.1 
     # via pytest-datadir
-python-jose[cryptography]==3.2.0
-    # via isacc_messaging (setup.cfg)
-python-json-logger==0.1.11
-    # via isacc_messaging (setup.cfg)
-pytz==2024.1
-    # via twilio
-redis==3.5.3
-    # via
-    #   isacc_messaging (setup.cfg)
-    #   pytest-redis
-requests==2.26.0
-    # via
-    #   fhirclient
-    #   isacc_messaging (setup.cfg)
-    #   requests-cache
-    #   requests-mock
-    #   twilio
-requests-cache==0.6.4
-    # via isacc_messaging (setup.cfg)
 requests-mock==1.9.3
     # via isacc_messaging (setup.cfg)
-rsa==4.7
-    # via python-jose
-six==1.16.0
-    # via
-    #   cryptography
-    #   ecdsa
-    #   isodate
-    #   python-jose
-    #   requests-mock
-    #   url-normalize
 toml==0.10.2
     # via pytest
 twilio==7.14.1

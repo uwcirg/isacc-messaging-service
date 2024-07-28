@@ -28,6 +28,8 @@ flask==1.1.2
     #   isacc_messaging (setup.cfg)
 flask-cors==4.0.1
     # via isacc_messaging (setup.cfg)
+flask-session==0.4.1
+    # via isacc_messaging (setup.cfg)
 gunicorn==20.1.0
     # via isacc_messaging (setup.cfg)
 idna==3.2
@@ -83,7 +85,10 @@ urllib3==1.26.7
     # via requests
 werkzeug==2.0.1
     # via flask
-importlib-metadata==4.8.1  # via click
-typing-extensions==3.10.0.2  # via importlib-metadata
-zipp==3.5.0               # via importlib-metadata
+importlib-metadata==4.8.1  
+    # via click
+typing-extensions==3.10.0.2  
+    # via importlib-metadata
+zipp==3.5.0               
+    # via importlib-metadata
 git+https://github.com/uwcirg/fhir-migrations
