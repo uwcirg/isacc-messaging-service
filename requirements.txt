@@ -6,8 +6,6 @@
 #
 authlib==0.14.3
     # via isacc_messaging (setup.cfg)
-cachelib==0.13.0
-    # via flask-session
 certifi==2021.5.30
     # via requests
 cffi==1.14.1
@@ -27,11 +25,8 @@ fhirclient==4.1.0
 flask==1.1.2
     # via
     #   flask-cors
-    #   flask-session
     #   isacc_messaging (setup.cfg)
 flask-cors==4.0.1
-    # via isacc_messaging (setup.cfg)
-flask-session==0.4.1
     # via isacc_messaging (setup.cfg)
 gunicorn==20.1.0
     # via isacc_messaging (setup.cfg)
