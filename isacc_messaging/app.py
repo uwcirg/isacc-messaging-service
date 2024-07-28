@@ -4,7 +4,7 @@ from logging import config as logging_config
 import os
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# from fhir_migrations import commands as migration_commands
+from fhir_migrations import commands as migration_commands
 from isacc_messaging.api import views
 from isacc_messaging.audit import audit_entry, audit_log_init
 from isacc_messaging.extensions import oauth
@@ -58,7 +58,7 @@ def register_blueprints(app):
     """register all blueprints for application
     """
     app.register_blueprint(views.base_blueprint)
-    # app.register_blueprint(migration_commands.migration_blueprint)
+    app.register_blueprint(migration_commands.migration_blueprint)
 
 
 def configure_proxy(app):
