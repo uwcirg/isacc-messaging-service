@@ -49,7 +49,7 @@ exceptiongroup==1.2.2
     # via
     #   cattrs
     #   pytest
-fhirclient==4.2.0
+fhirclient==4.1.0
     # via isacc_messaging (setup.cfg)
 flask==3.0.3
     # via
