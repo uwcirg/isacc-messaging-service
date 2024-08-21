@@ -35,5 +35,5 @@ class IsaccFHIRDate(FHIRDate):
         return self.isostring
 
 
-DEEP_PAST = IsaccFHIRDate("1975-01-01T00:00:00Z")
-DEEP_FUTURE = IsaccFHIRDate("2025-01-01T00:00:00Z")
+DEEP_PAST = IsaccFHIRDate("1975-01-01")
+DEEP_FUTURE = IsaccFHIRDate("2025-01-01")
