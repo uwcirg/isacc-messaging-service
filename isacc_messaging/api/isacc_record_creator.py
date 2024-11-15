@@ -3,13 +3,13 @@ from flask import current_app
 import re
 import requests
 from typing import List, Tuple
-import json
 
 from fhirclient.models.communication import Communication
 from twilio.base.exceptions import TwilioRestException
 
 from isacc_messaging.api.email_notifications import send_message_received_notification
 from isacc_messaging.audit import audit_entry
+from isacc_messaging.exceptions import IsaccTwilioSIDnotFound
 from isacc_messaging.models.fhir import (
     HAPI_request,
     first_in_bundle,
@@ -46,11 +46,6 @@ def expand_template_args(content: str, patient: Patient, practitioner: Practitio
     c = case_insensitive_replace(content, "{name}", preferred_name(patient))
     c = case_insensitive_replace(c, "{username}", preferred_name(practitioner, "Caring Contacts Team"))
     return c
-
-
-class IsaccTwilioError(Exception):
-    """Raised when Twilio SMS are not functioning as required for ISACC"""
-    pass
 
 
 class IsaccRecordCreator:
@@ -211,7 +206,7 @@ class IsaccRecordCreator:
                 extra={"message_sid": message_sid},
                 level='error'
             )
-            raise IsaccTwilioError(f"ERROR! {error}: {message_sid}")
+            raise IsaccTwilioSIDnotFound(f"ERROR! {error}: {message_sid}")
 
         cr = CommunicationRequest(cr)
         patient = resolve_reference(cr.recipient[0].reference)
