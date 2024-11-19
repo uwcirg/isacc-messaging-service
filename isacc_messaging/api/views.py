@@ -249,7 +249,7 @@ def retry_requests():
 
         # Only expecting one route at this time
         if (
-                failed_request.url.endswith("/NessageStatus") and
+                failed_request.url.endswith("/MessageStatus") and
                 failed_request.method.upper() == 'POST'):
             with current_app.test_request_context():
                 response, response_code = message_status_update(
