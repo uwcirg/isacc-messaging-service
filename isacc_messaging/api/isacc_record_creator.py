@@ -325,11 +325,11 @@ class IsaccRecordCreator:
 
     def execute_requests(self) -> Tuple[List[dict], List[dict]]:
         """
-        For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
+        For all due CommunicationRequests (up to throttle limit), generate SMS, create Communication resource, and update CommunicationRequest
         """
         successes = []
         errors = []
-
+        throttle_limit = 30  # conservative value based on heuristics from logs
         now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
 
@@ -339,6 +339,7 @@ class IsaccRecordCreator:
             "occurrence": f"le{now.isoformat()}",
         })
 
+        sent = 0
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
             # as that message was likely the next-outgoing for the patient,
@@ -418,6 +419,13 @@ class IsaccRecordCreator:
                     extra={"resource": f"Communication/{comm.id}", "statusReason": e},
                     level='exception'
                 )
+
+            # Flooding system on occasions such as a holiday message to all,
+            # leads to an overwhelmed system.  Restrict the flood by processing
+            # only throttle_limit per run.
+            sent += 1
+            if sent > throttle_limit:
+                break
 
         return successes, errors
 
