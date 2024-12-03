@@ -235,7 +235,7 @@ class IsaccPatient(Patient):
         for c in next_in_bundle(Communication.for_patient(self, category="isacc-manually-sent-message")):
             most_recent_followup = FHIRDate(c["sent"])
             break
-        # also possible a followup was recorded as `outside communication`
+        # also possible a followup was recorded as `outside communication` or resolved
         for c in next_in_bundle(Communication.about_patient(self)):
             # only consider outside communications reported to have been `sent`
             if "sent" in c:
