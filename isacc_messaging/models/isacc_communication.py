@@ -39,12 +39,15 @@ class IsaccCommunication(Communication):
     def about_patient(patient):
         """Query for "outside" Communications about the patient
 
+        This includes the dummy Communications added when staff resolve
+        a message without a response (category:isacc-message-resolved-no-send)
+
         NB: only `sent` or `received` will have a valueDateTime depending on
         direction of outside communication.  `sent` implies communication from
         practitioner, `received` implies communication from patient.
         """
         return HAPI_request("GET", "Communication", params={
-            "category": "isacc-non-sms-message",
+            "category": "isacc-non-sms-message,isacc-message-resolved-no-send",
             "subject": f"Patient/{patient.id}",
             "_sort": "-sent",
         })

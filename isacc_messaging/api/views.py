@@ -2,12 +2,16 @@ from functools import wraps
 import click
 import logging
 from datetime import datetime
+from time import sleep
 from flask import Blueprint, jsonify, request
 from flask import current_app
+from flask.cli import with_appcontext
+from twilio.request_validator import RequestValidator
 
 from isacc_messaging.api.isacc_record_creator import IsaccRecordCreator
 from isacc_messaging.audit import audit_entry
-from twilio.request_validator import RequestValidator
+from isacc_messaging.exceptions import IsaccTwilioSIDnotFound
+from isacc_messaging.robust_request import serialize_request, queue_request, pop_request
 
 base_blueprint = Blueprint('base', __name__, cli_group=None)
 
@@ -88,22 +92,43 @@ def auditlog_addevent():
 
 
 @base_blueprint.route("/MessageStatus", methods=['POST'])
-def message_status_update():
+def message_status_update(callback_req=None, attempt_count=0):
+    """Registered callback for Twilio to transmit updates
+
+    As Twilio occasionally hits this callback prior to local data being
+    available, it is also called subsequently from a job queue.  The
+    parameters are only defined in the retry state.
+
+    :param req: request from a job queue
+    :param attempt_count: the number of failed attemts thus far, only
+        defined from job queue
+    """
+    use_request = request
+    if callback_req:
+        use_request = callback_req
+
     audit_entry(
         f"Call to /MessageStatus webhook",
-        extra={'request.values': dict(request.values)},
+        extra={'use_request.values': dict(use_request.values)},
         level='debug'
     )
 
     record_creator = IsaccRecordCreator()
     try:
-        record_creator.on_twilio_message_status_update(request.values)
+        record_creator.on_twilio_message_status_update(use_request.values)
     except Exception as ex:
         audit_entry(
             f"on_twilio_message_status_update generated error {ex}",
             level='error'
         )
-        return ex, 200
+        # Couldn't locate the message, most likely means twilio was quicker
+        # to call back, than HAPI could persist and find.  Push to REDIS
+        # for another attempt later
+        if isinstance(ex, IsaccTwilioSIDnotFound):
+            req = serialize_request(use_request, attempt_count=attempt_count)
+            queue_request(req)
+
+        return str(ex), 200
     return '', 204
 
 
@@ -155,8 +180,8 @@ def incoming_sms():
             level="error")
         return stackstr, 200
     if result is not None:
-        # Occurs when message is incoming from unknown phone 
-        # or request is coming from a subscribed phone number, but 
+        # Occurs when message is incoming from unknown phone
+        # or request is coming from a subscribed phone number, but
         # internal logic renders it invalid
         audit_entry(
             f"on_twilio_message_received generated error {result}",
@@ -212,6 +237,25 @@ def execute_requests():
         f"Execution failed for CommunicationRequest resources:\n{error_list}"
     ])
 
+
+@base_blueprint.cli.command("retry_requests")
+@with_appcontext
+def retry_requests():
+    """Look for any failed requests and retry now"""
+    while True:
+        failed_request = pop_request()
+        if not failed_request:
+            break
+
+        # Only expecting one route at this time
+        if (
+                failed_request.url.endswith("/MessageStatus") and
+                failed_request.method.upper() == 'POST'):
+            with current_app.test_request_context():
+                response, response_code = message_status_update(
+                    failed_request, failed_request.attempt_count + 1)
+                if response_code != 204:
+                    sleep(1)  # give system a moment to catch up before retry
 
 @base_blueprint.cli.command("send-system-emails")
 @click.argument("category", required=True)
@@ -301,4 +345,3 @@ def deactivate_patient(patient_id):
         f"Patient {patient_id} active set to false",
         level='info'
     )
-

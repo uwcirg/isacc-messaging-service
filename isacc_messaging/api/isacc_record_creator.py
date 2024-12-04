@@ -1,14 +1,15 @@
 from datetime import datetime, timedelta
+from flask import current_app
 import re
+import requests
 from typing import List, Tuple
 
 from fhirclient.models.communication import Communication
-from flask import current_app
 from twilio.base.exceptions import TwilioRestException
 
 from isacc_messaging.api.email_notifications import send_message_received_notification
-from isacc_messaging.api.ml_utils import predict_score
 from isacc_messaging.audit import audit_entry
+from isacc_messaging.exceptions import IsaccTwilioSIDnotFound
 from isacc_messaging.models.fhir import (
     HAPI_request,
     first_in_bundle,
@@ -45,11 +46,6 @@ def expand_template_args(content: str, patient: Patient, practitioner: Practitio
     c = case_insensitive_replace(content, "{name}", preferred_name(patient))
     c = case_insensitive_replace(c, "{username}", preferred_name(practitioner, "Caring Contacts Team"))
     return c
-
-
-class IsaccTwilioError(Exception):
-    """Raised when Twilio SMS are not functioning as required for ISACC"""
-    pass
 
 
 class IsaccRecordCreator:
@@ -210,7 +206,7 @@ class IsaccRecordCreator:
                 extra={"message_sid": message_sid},
                 level='error'
             )
-            raise IsaccTwilioError(f"ERROR! {error}: {message_sid}")
+            raise IsaccTwilioSIDnotFound(f"ERROR! {error}: {message_sid}")
 
         cr = CommunicationRequest(cr)
         patient = resolve_reference(cr.recipient[0].reference)
@@ -303,12 +299,20 @@ class IsaccRecordCreator:
         )
 
     def score_message(self, message):
-        model_path = current_app.config.get('TORCH_MODEL_PATH')
-        if not model_path:
+        ml_service_address = current_app.config.get('ML_SERVICE_ADDRESS')
+        if not ml_service_address:
             return "routine"
 
         try:
-            score = predict_score(message, model_path)
+            url = f'{ml_service_address}/predict_score'
+            response = requests.post(url, json={"message": message})
+            response.raise_for_status()
+            audit_entry(
+                f"predict_score call response: {response.json()}",
+                level='info'
+            )
+
+            score = response.json().get('score')
             if score == 1:
                 return "stat"
         except Exception as e:
@@ -321,11 +325,11 @@ class IsaccRecordCreator:
 
     def execute_requests(self) -> Tuple[List[dict], List[dict]]:
         """
-        For all due CommunicationRequests, generate SMS, create Communication resource, and update CommunicationRequest
+        For all due CommunicationRequests (up to throttle limit), generate SMS, create Communication resource, and update CommunicationRequest
         """
         successes = []
         errors = []
-
+        throttle_limit = 30  # conservative value based on heuristics from logs
         now = datetime.now().astimezone()
         cutoff = now - timedelta(days=2)
 
@@ -335,6 +339,7 @@ class IsaccRecordCreator:
             "occurrence": f"le{now.isoformat()}",
         })
 
+        sent = 0
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
             # as that message was likely the next-outgoing for the patient,
@@ -385,7 +390,7 @@ class IsaccRecordCreator:
             try:
                 cr.status = "completed"
                 cr.persist()
-                comm_status, comm_statusReason = self.process_cr(cr, successes)
+                comm_status, comm_statusReason = self.process_cr(cr)
                 dispatched_comm = comm.change_status(status=comm_status)
                 audit_entry(
                     f"Updated status of Communication/{comm.id} to {comm_status}",
@@ -415,8 +420,15 @@ class IsaccRecordCreator:
                     level='exception'
                 )
 
+            # Flooding system on occasions such as a holiday message to all,
+            # leads to an overwhelmed system.  Restrict the flood by processing
+            # only throttle_limit per run.
+            sent += 1
+            if sent > throttle_limit:
+                break
+
         return successes, errors
 
-    def process_cr(self, cr: CommunicationRequest, successes: list):
+    def process_cr(self, cr: CommunicationRequest):
         status, statusReason = self.dispatch_cr(cr=cr)
         return status, statusReason
