@@ -348,11 +348,9 @@ class IsaccRecordCreator:
             if not patient.active or cr.occurrenceDateTime.date < cutoff:
                 cr.status = "revoked"
                 cr.persist()
-                revoked_reason = ""
+                revoked_reason = "Past the cutoff"
                 if not patient.active:
                     revoked_reason = "Recipient is not active"
-                else:
-                    revoked_reason = "Past the cutoff"
                 cr.report_cr_status(status_reason=revoked_reason)
                 errors.append({'id': cr.id, 'error': revoked_reason})
                 patient.mark_next_outgoing()  # update given state change
