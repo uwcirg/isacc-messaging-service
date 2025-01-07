@@ -254,7 +254,7 @@ class IsaccPatient(Patient):
 
         save_value = oldest_reply
         if not oldest_reply:
-            # without any pending outgoing messages, add a bogus value deep in the past to keep the patient
+            # without any pending outgoing messages, add a bogus value deep in the future to keep the patient
             # in the search (searching by extension will eliminate patients without said extension)
             save_value = DEEP_FUTURE
 
