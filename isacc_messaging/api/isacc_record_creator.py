@@ -342,10 +342,7 @@ class IsaccRecordCreator:
         sent = 0
         for cr_json in next_in_bundle(result):
             cr = CommunicationRequest(cr_json)
-            # as that message was likely the next-outgoing for the patient,
-            # update the extension used to track next-outgoing-message time
             patient = resolve_reference(cr.recipient[0].reference)
-            patient.mark_next_outgoing()
 
             # Do not interact with CR if the patient is inactive or sending date is past the cutoff
             if not patient.active or cr.occurrenceDateTime.date < cutoff:
@@ -358,6 +355,7 @@ class IsaccRecordCreator:
                     revoked_reason = "Past the cutoff"
                 cr.report_cr_status(status_reason=revoked_reason)
                 errors.append({'id': cr.id, 'error': revoked_reason})
+                patient.mark_next_outgoing()  # update given state change
                 continue
 
             # Otherwise, create a communication
@@ -384,6 +382,7 @@ class IsaccRecordCreator:
                     extra={"Updated Communication": stopped_comm},
                     level='debug'
                 )
+                patient.mark_next_outgoing()  # update given state change
                 continue
 
             # Otherwise, update according to the feedback from the dispatch
@@ -419,6 +418,7 @@ class IsaccRecordCreator:
                     extra={"resource": f"Communication/{comm.id}", "statusReason": e},
                     level='exception'
                 )
+            patient.mark_next_outgoing()  # update given state change
 
             # Flooding system on occasions such as a holiday message to all,
             # leads to an overwhelmed system.  Restrict the flood by processing
