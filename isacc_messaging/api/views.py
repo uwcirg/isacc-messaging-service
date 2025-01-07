@@ -275,18 +275,19 @@ def send_system_emails(category, dry_run, include_test_patients):
 @click.option("--dry-run", is_flag=True, default=False, help="Simulate execution; don't persist to FHIR store")
 def update_patient_extensions(dry_run):
     """Iterate through active patients, update any stale/missing extensions"""
-    # this was a 1 and done migration method.  disable for now
-    raise click.ClickException(
-        "DISABLED: unsafe to run as this will now undo any user marked "
-        "read messages via "
-        "https://github.com/uwcirg/isacc-messaging-client-sof/pull/85")
+    # not routinely used - typically following a bug fix WRT user extensions
+
+    # NB - no longer updating the followup-extension as it would displace
+    # any work done by users who "marked as read" the latest message for a patient
+    # see https://github.com/uwcirg/isacc-messaging-client-sof/pull/85
+
     from isacc_messaging.models.fhir import next_in_bundle
     from isacc_messaging.models.isacc_patient import IsaccPatient as Patient
     active_patients = Patient.active_patients()
     for json_patient in next_in_bundle(active_patients):
         patient = Patient(json_patient)
         patient.mark_next_outgoing(persist_on_change=not dry_run)
-        patient.mark_followup_extension(persist_on_change=not dry_run)
+        # (see note above) patient.mark_followup_extension(persist_on_change=not dry_run)
 
 
 @base_blueprint.cli.command("maintenance-reinstate-all-patients")
