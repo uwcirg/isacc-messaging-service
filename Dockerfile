@@ -15,4 +15,4 @@ ENV FLASK_APP=isacc_messaging.app:create_app() \
 
 EXPOSE "${PORT}"
 
-CMD gunicorn --bind "0.0.0.0:${PORT:-8000}" ${FLASK_APP}
+CMD flask upgrade && gunicorn --bind "0.0.0.0:${PORT:-8000}" ${FLASK_APP}
