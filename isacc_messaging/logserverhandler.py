@@ -28,5 +28,5 @@ class LogServerHandler(logging.Handler):
         except RequestException as ex:
             # bootstrap problems - attempt to log to root logger
             root_logger = logging.getLogger('root')
-            root_logger.error("error submitting message to logserver: %s", self.url)
+            root_logger.error("error submitting message to logserver: %s, %s", self.url, self.content)
             root_logger.exception(ex)
