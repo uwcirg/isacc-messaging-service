@@ -1,9 +1,9 @@
 # Migration script generated for patch_communicationrequest_content
-revision = 'patch_communicationrequest_content'
-down_revision = '7542b481-21cb-483c-b72a-6c1502375a65'  # Update if needed
+revision = 'ac2232ce-8634-43b9-93fd-385a31793d2e'
+down_revision = '7542b481-21cb-483c-b72a-6c1502375a65'
 
 import logging
-from isacc_messaging.models.fhir import next_in_bundle, resolve_reference
+from isacc_messaging.models.fhir import next_in_bundle
 from isacc_messaging.models.isacc_communicationrequest import IsaccCommunicationRequest
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,7 +12,7 @@ def upgrade():
     # Find all active CommunicationRequest resources
     params = {
         "status": "active",
-        "_count": 1000
+        "_count": 5000
     }
     from isacc_messaging.models.fhir import HAPI_request
     bundle = HAPI_request('GET', 'CommunicationRequest', params=params)
@@ -38,5 +38,5 @@ def upgrade():
     logging.info(f"Migration complete. Updated {count} CommunicationRequest resources.")
 
 def downgrade():
-    # No value in reverting
-    print('downgraded') 
+    # No value in reverting as this is a one-time migration
+    print('downgraded (no action taken)')
